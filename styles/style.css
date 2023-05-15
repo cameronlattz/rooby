@@ -1,0 +1,9 @@
+.tooltip .section .calculator {
+    font-style: italic;
+}
+
+.message-log .chat.calculator {
+    background-color: lightgray;
+    border: 1px solid gray;
+    padding: 2px;
+}
