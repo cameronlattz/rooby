@@ -71,8 +71,146 @@ const util = function() {
 	const capitalizeFirstLetter = function(str) {
 		return str.charAt(0).toUpperCase() + str.slice(1);
 	}
+
+	const BattleTooltips = function() {
+		function BattleTooltips(battle) {
+			var _this = this;
+			this.battle = void 0;
+			this.clickTooltipEvent = function(e) {
+				if (BattleTooltips.isLocked) {
+					e.preventDefault();
+					e.stopImmediatePropagation();
+				}
+			};
+			this.holdLockTooltipEvent = function(e) {
+				if (BattleTooltips.isLocked) BattleTooltips.hideTooltip();
+				var target = e.currentTarget;
+				_this.showTooltip(target);
+				var factor = e.type === 'mousedown' && target.tagName === 'BUTTON' ? 2 : 1;
+				BattleTooltips.longTapTimeout = setTimeout(function() {
+					BattleTooltips.longTapTimeout = 0;
+					_this.lockTooltip();
+				}, BattleTooltips.LONG_TAP_DELAY * factor);
+			};
+			this.showTooltipEvent = function(e) {
+				if (BattleTooltips.isLocked)
+					return;
+				_this.showTooltip(e.currentTarget);
+			};
+			this.battle = battle;
+		}
+		BattleTooltips.hideTooltip = function hideTooltip() {
+			if (!BattleTooltips.elem) return;
+			BattleTooltips.elem.parentNode.removeChild(BattleTooltips.elem);
+			BattleTooltips.elem = null;
+			BattleTooltips.parentElem = null;
+			BattleTooltips.isLocked = false;
+			document.querySelector("#tooltipwrapper").classList.remove("tooltip-locked");
+		};
+		var _proto = BattleTooltips.prototype;
+		_proto.lockTooltip = function lockTooltip() {
+			if (BattleTooltips.elem && !BattleTooltips.isLocked) {
+				BattleTooltips.isLocked = true;
+				if (BattleTooltips.isPressed) {
+					BattleTooltips.parentElem.classList.remove("pressed");
+					BattleTooltips.isPressed = false;
+				}
+				document.querySelector("#tooltipwrapper").classList.add("tooltip-locked");
+			}
+		};
+		_proto.listen = function listen(elem) {
+				const hasTooltip = elem.querySelector('.has-tooltip');
+				hasTooltip.addEventListener('mouseover', this.showTooltipEvent.bind(this));
+				hasTooltip.addEventListener('click', this.clickTooltipEvent.bind(this));
+				hasTooltip.addEventListener('focus', this.showTooltipEvent.bind(this));
+				hasTooltip.addEventListener('mouseout', BattleTooltips.unshowTooltip.bind(BattleTooltips));
+				hasTooltip.addEventListener('mousedown', this.holdLockTooltipEvent.bind(this));
+				hasTooltip.addEventListener('blur', BattleTooltips.unshowTooltip.bind(BattleTooltips));
+				hasTooltip.addEventListener('mouseup', BattleTooltips.unshowTooltip.bind(BattleTooltips));
+		};
+		BattleTooltips.unshowTooltip = function unshowTooltip() {
+			if (BattleTooltips.isLocked) return;
+			if (BattleTooltips.isPressed) {
+				BattleTooltips.parentElem.classList.remove("pressed");
+				BattleTooltips.isPressed = false;
+			}
+			BattleTooltips.hideTooltip();
+		};
+		_proto.showTooltip = function showTooltip(html, elem) {
+			this.placeTooltip(html, elem);
+			return true;
+		};
+		_proto.placeTooltip = function placeTooltip(innerHTML, hoveredElem, notRelativeToParent, type) {
+			var elem;
+			if (hoveredElem) {
+				elem = hoveredElem;
+			} else {
+				elem = this.battle.scene.$turn[0];
+				notRelativeToParent = true;
+			}
+			var hoveredX1 = elem.getBoundingClientRect().left;
+			if (!notRelativeToParent) {
+				elem = elem.parentNode;
+			}
+			var hoveredY1 = elem.getBoundingClientRect().top;
+			var hoveredY2 = hoveredY1 + elem.offsetHeight;
+			var x = Math.max(hoveredX1 - 2, 0);
+			var y = Math.max(hoveredY1 - 5, 0);
+			var wrapper = document.querySelector("#tooltipwrapper");
+			if (wrapper == void 0) {
+				wrapper = document.createElement("div");
+				wrapper.id = "tooltipwrapper";
+				wrapper.setAttribute("role", "tooltip");
+				document.body.appendChild(wrapper);
+				wrapper.addEventListener("click", function(e) {
+					try {
+						var selection = window.getSelection();
+						if (selection.type === 'Range')	return;
+					} catch (err) {}
+					BattleTooltips.hideTooltip();
+				});
+			} else {
+				wrapper.classList.remove("tooltip-locked");
+			}
+			wrapper.style.left = x + "px";
+			wrapper.style.top = y + "px";
+			innerHTML = "<div class=\"tooltipinner\"><div class=\"tooltip tooltip-" + type + "\">" + innerHTML + "</div></div>";
+			wrapper.innerHTML = innerHTML;
+			document.body.appendChild(wrapper);
+			BattleTooltips.elem = wrapper.querySelector(".tooltip");
+			BattleTooltips.isLocked = false;
+			var height = BattleTooltips.elem.offsetHeight;
+			if (y - height < 1) {
+				y = hoveredY2 + height + 5;
+				if (y > document.documentElement.clientHeight) {
+					y = height + 1;
+				}
+				wrapper.style.top = y + "px";
+			} else if (y < 75) {
+				y = hoveredY2 + height + 5;
+				if (y < document.documentElement.clientHeight) {
+					wrapper.style.top = y + "px";
+				}
+			}
+			var width = BattleTooltips.elem.offsetWidth;
+			if (x > document.documentElement.clientWidth - width - 2) {
+				x = document.documentElement.clientWidth - width - 2;
+				wrapper.style.left = x + "px";
+			}
+	
+			BattleTooltips.parentElem = hoveredElem || null;
+			return true;
+		};
+		_proto.hideTooltip = function hideTooltip() {
+			BattleTooltips.hideTooltip();
+		};
+		return BattleTooltips;
+	}();
+
+	const battleTooltips = new BattleTooltips();
 	
 	return {
+		battleTooltips: battleTooltips,
 		calculateProbability: calculateProbability,
 		capitalizeFirstLetter: capitalizeFirstLetter,
 		convertTsToObject: convertTsToObject,

@@ -8,9 +8,6 @@
       if (element.classList.contains("tooltipinner")) {
         tooltipCalculations(element);
       }
-      else if (element.classList.contains("chatbox")) {
-        chatboxCommands(element);
-      }
       else if (element.classList.contains("ps-popup")) {
         settingsPopup(element);
       }
@@ -20,75 +17,79 @@
       }
     }
   });
+  doc.addEventListener("mouseover", (event) => {
+    const element = event.target;
+    if (element.getAttribute("title") === "Not revealed") {
+      const trainer = element.parentNode.parentNode;
+      const opposingTrainer = trainer.classList.contains("trainer-near") ? document.querySelector(".trainer-far") : document.querySelector(".trainer-near");
+      const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
+      const hasDitto = Array.from(opposingTrainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim()).some(name => name === "Ditto");
+ 
+      const unrevealedTypes = calc.unrevealedTypes(revealedPokemon, hasDitto);
+      var html = "<h2>Unrevealed Pokemon:</h2><p>";
+      for (const typeProbability of unrevealedTypes) {
+        html += "&nbsp;• " + util.capitalizeFirstLetter(typeProbability.type) + ": " + (typeProbability.probability*100).toFixed(0) + "%</br>";
+      }
+      html += "</p>";
+
+      const tooltip = util.battleTooltips;
+      tooltip.showTooltip(html, element);
+      element.removeAttribute("title");
+      element.addEventListener("mouseout", function(event) {
+        tooltip.hideTooltip(event.target);
+        element.setAttribute("title", "Not revealed");
+      });
+    }
+  });
 
   const tooltipCalculations = function(element) {
-    const tooltip = element.querySelector(".tooltip-pokemon, .tooltip-activepokemon");
+    const tooltip = element.querySelector(".tooltip-pokemon, .tooltip-activepokemon, .tooltip-move");
     if (tooltip != void 0) {
       let section = element.querySelector(".section");
       if (section == void 0) {
         section = document.createElement("p");
         section.className = "section";
+      }
+      if (tooltip.classList.contains("tooltip-move")) {
+        const moveTag = tooltip.querySelector(".section");
+        section = document.createElement("p");
+        section.className = "section";
+        const damageCalc = calc.damage();
+        section.innerHTML += "<div class='calculator'>Damage: " + damageCalc.minDamage + "% - " + damageCalc.maxDamage + "%<br>Crit (" + damageCalc.critRate + "%): " + 
+          damageCalc.critMinDamage + "% - " + damageCalc.critMaxDamage + "%<br>" + damageCalc.hkoChance + "% chance to " + damageCalc.hkoMultiple + "HKO</div>";
+        moveTag.before(section);
+      }
+      else {
         tooltip.appendChild(section);
-      }
-      const tooltipPokemonName = tooltip.querySelector("h2").innerHTML.split("<small>")[0].trim();
-      const pokemon = consts.pokemons.find(p => p.name == tooltipPokemonName);
-      const clickedMoves = pokemon.moves.filter(move => section.innerHTML.indexOf(move.name + " ") !== -1);
-      const validMoveSets = pokemon.moveSets.filter(ms => clickedMoves.every(cm => ms.moves.includes(cm.id)));
-      const unrevealedMoves = [];
-      for (const move of pokemon.moves.filter(move => !clickedMoves.includes(move))) {
-        const probability = validMoveSets.filter(vms => vms.moves.includes(move.id)).length / validMoveSets.length;
-        unrevealedMoves.push({ name: move.name, probability: probability });
-      }
-      unrevealedMoves.sort((a, b) => b.probability - a.probability);
-      for (const move of unrevealedMoves) {
-        section.innerHTML += "<span class='calculator'>• " + move.name + " <small>" + (move.probability*100).toFixed(0) + "%</small></span><br>";
-      }
-    }
-  }
-
-  const chatboxCommands = function(element) {
-    element.addEventListener("keydown", function(e) {
-      if (e.keyCode === 13) {
-        if (e.target.value === "/unrevealed") {
-          e.preventDefault();
-          e.stopPropagation();
-          e.target.value = "";
-          const messageLog = document.querySelector(".message-log");
-          const far = document.querySelector(".trainer-far");
-          const near = document.querySelector(".trainer-near");
-          for (const trainer of [far, near]) {
-            const div = document.createElement("div");
-            div.className = "chat calculator";
-            const trainerName = trainer.childNodes[0].innerHTML;
-            const revealedPokemon =  Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
-            div.innerHTML = "<strong>" + trainerName + " Unrevealed Pokemon: " + (consts.maxTeamSize - revealedPokemon.length) + "</strong>";
-            if (consts.maxTeamSize === revealedPokemon.length) continue;
-            for (const type in consts.typechart) {
-              if (pokemon.some(p => p.type === type)) {
-                for (const i = 0; i < 1000; i++) {
-                  RandomGen1Teams.randomTeam();
-                }
-              }
-              const probability = Math.random();
-              div.innerHTML += "<br>" + util.capitalizeFirstLetter(type) + ": " + (probability*100).toFixed(0) + "%";
-            }
-            messageLog.appendChild(div);
-            div.scrollIntoView();
-          }
+        const tooltipPokemonName = tooltip.querySelector("h2").innerHTML.split("<small>")[0].trim();
+        const pokemon = consts.pokemons.find(p => p.name == tooltipPokemonName);
+        const clickedMoves = pokemon.moves.filter(move => section.innerHTML.indexOf(move.name + " ") !== -1);
+        const unrevealedMoves = calc.unrevealedMoves(pokemon, clickedMoves);
+        for (const move of unrevealedMoves) {
+          section.innerHTML += "<div class='calculator'>• " + move.name + " <small>" + move.probability + "%</small></div>";
         }
       }
-    });
+    }
   }
 
   const settingsPopup = function(element) {
     const avatarButton = element.querySelector("[name='avatars']");
     const extensionAvatarButton = avatarButton.parentNode.parentNode.querySelector(".extension-avatar");
     if (extensionAvatarButton == void 0) {
+      const avatarsP = document.createElement("p");
+      const disableCustomAvatarsCheckbox = document.createElement("input");
+      disableCustomAvatarsCheckbox.setAttribute("type", "checkbox");
+      const disableCustomAvatarsLabel = document.createElement("label");
+      disableCustomAvatarsLabel.className = "optlabel";
+      disableCustomAvatarsLabel.appendChild(disableCustomAvatarsCheckbox);
+      avatarsP.appendChild(disableCustomAvatarsLabel);
+      disableCustomAvatarsLabel.innerHTML += " Disable opponent custom avatars";
+      avatarButton.parentNode.after(avatarsP);
       const button = document.createElement("button");
-      button.innerHTML = "Change extension avatar";
+      button.innerHTML = "Change custom avatar";
       button.className = "extension-avatar";
       button.addEventListener("click", function() {
-        const url = window.prompt("Please enter a URL to your new extension avatar:");
+        const url = window.prompt("Please enter a URL to your new custom avatar:");
         const name = sprite.parentNode.childNodes[1].innerHTML;
         saveAvatar(name, url);
         updateAvatars(url);
@@ -112,7 +113,7 @@
       };
 
       const iconFunction = function(e) {
-        window.alert("change icons");
+        
       }
       
       parent.after(pBuilder("Random shiny percentage", "shiny_percentage", className, null, randomFunction, { type: "number", max: 100, min: 0}));

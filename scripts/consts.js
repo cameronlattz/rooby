@@ -22175,13 +22175,13 @@ const consts = function() {
 		"clefairy": {
 			"num": 35,
 			"name": "Clefairy",
-			"types": ["Fairy"],
+			"types": ["Normal"],
 			"color": "Pink"
 		},
 		"clefable": {
 			"num": 36,
 			"name": "Clefable",
-			"types": ["Fairy"],
+			"types": ["Normal"],
 			"color": "Pink"
 		},
 		"vulpix": {
@@ -22199,13 +22199,13 @@ const consts = function() {
 		"jigglypuff": {
 			"num": 39,
 			"name": "Jigglypuff",
-			"types": ["Normal", "Fairy"],
+			"types": ["Normal"],
 			"color": "Pink"
 		},
 		"wigglytuff": {
 			"num": 40,
 			"name": "Wigglytuff",
-			"types": ["Normal", "Fairy"],
+			"types": ["Normal"],
 			"color": "Pink"
 		},
 		"zubat": {
@@ -22451,14 +22451,14 @@ const consts = function() {
 		"magnemite": {
 			"num": 81,
 			"name": "Magnemite",
-			"types": ["Electric", "Steel"],
+			"types": ["Electric"],
 			"gender": "N",
 			"color": "Gray"
 		},
 		"magneton": {
 			"num": 82,
 			"name": "Magneton",
-			"types": ["Electric", "Steel"],
+			"types": ["Electric"],
 			"gender": "N",
 			"color": "Gray"
 		},
@@ -22707,7 +22707,7 @@ const consts = function() {
 		"mrmime": {
 			"num": 122,
 			"name": "Mr. Mime",
-			"types": ["Psychic", "Fairy"],
+			"types": ["Psychic"],
 			"color": "Pink"
 		},
 		"scyther": {

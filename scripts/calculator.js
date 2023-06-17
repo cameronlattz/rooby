@@ -1,4 +1,4 @@
-(function() {
+const calc = function() {
 	const moveSetsUrl = "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/gen1/random-data.json";
 	let allPokemons = [];
 
@@ -14,7 +14,7 @@
 				consts.pokemons = pokemons;
 			});
 	}
-	
+
 	const buildPokemons = function(moveSets) {
 		const validPokemonMoveSets = {};
 		for (const moveSetName in moveSets) {
@@ -28,6 +28,7 @@
 			// if (consts.levelScales[pokemonId] != void 0) level = consts.levelScales[pokemonId];
 			// else if (consts.levelScales[validPokemonMoveSets[pokemonId].tier.toLowerCase()] != void 0) level = consts.levelScales[validPokemonMoveSets[pokemonId].tier.toLowerCase()];
 			const pokemon = {
+				critRate: critRate(1),
 				id: pokemonId,
 				level: level,
 				moves: calculateMoves(pokemonMoveSets),
@@ -37,7 +38,7 @@
 				probability: 1,
 				tier: validPokemonMoveSets[pokemonId].tier,
 				types: consts.pokedex[pokemonId].types
-			};
+			}; 
 			pokemons.push(pokemon);
 		}
 		calculateProbabilities(pokemons);
@@ -215,4 +216,50 @@
 		moveSets = util.removeDuplicates(moveSets, "moves", "probability");
 		return moveSets.sort((a, b) => b.probability - a.probability);
 	}
-})();
+
+	const unrevealedMoves = function(pokemon, clickedMoves) {
+        const validMoveSets = pokemon.moveSets.filter(ms => clickedMoves.every(cm => ms.moves.includes(cm.id)));
+        const unrevealedMoves = [];
+        for (const move of pokemon.moves.filter(move => !clickedMoves.includes(move))) {
+          const probability = validMoveSets.filter(vms => vms.moves.includes(move.id)).length / validMoveSets.length;
+          unrevealedMoves.push({ name: move.name, probability: (probability*100).toFixed(0) });
+        }
+        unrevealedMoves.sort((a, b) => b.probability - a.probability);
+		return unrevealedMoves;
+	}
+	
+	const unrevealedTypes = function(revealedMons, haveDitto) {
+		let typeProbabilities = [];
+		for (const type in consts.typechart) {
+		  const capitalizedType = util.capitalizeFirstLetter(type);
+		  if (consts.pokemons.some(p => p.types.includes(capitalizedType))) {
+			const probability = Math.random();
+			typeProbabilities.push({ type: type, probability: probability });
+		  }
+		}
+		typeProbabilities.sort((a, b) => b.probability - a.probability);
+		return typeProbabilities;
+	}
+
+	const damage = function(pokemon, opposingPokemon, healthRemaining, burned, buffs, debuffs) {
+		return {
+			minDamage: (Math.random()*25).toFixed(0),
+			maxDamage: (Math.random()*25 + 25).toFixed(0),
+			critRate: (Math.random()*25).toFixed(0),
+			critMinDamage: (Math.random()*50).toFixed(0),
+			critMaxDamage: (Math.random()*50 + 50).toFixed(0),
+			hkoChance: (Math.random()*100).toFixed(0),
+			hkoMultiple: (Math.random()*3 + 1).toFixed(0)
+		}
+	}
+
+	const critRate = function(baseSpeed) {
+		return 1;
+	}
+
+	return {
+		damage: damage,
+		unrevealedMoves: unrevealedMoves,
+		unrevealedTypes: unrevealedTypes
+	}
+}();
