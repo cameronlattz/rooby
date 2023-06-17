@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,  
-    "name": "Showdown Extension",
+    "name": "RooBY",
     "version": "1.0",
     "description": "Add extra functionality to Pokemon Showdown",
     "icons": {
@@ -15,7 +15,8 @@
         "css": ["styles/style.css"],
         "matches": [
           "https://play.pokemonshowdown.com/*"
-        ]
+        ],
+        "run_at": "document_end"    
       }
     ]
   }
