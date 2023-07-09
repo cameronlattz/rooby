@@ -1,5 +1,9 @@
 (function() {
   const sprites = {};
+  let revealedFarPokemon = [];
+  let revealedNearPokemon = [];
+  let unrevealedFarTypes = {};
+  let unrevealedNearTypes = {};
   let backdrop;
   const doc = document;
   doc.addEventListener("DOMNodeInserted", (event) => {
@@ -11,6 +15,22 @@
       else if (element.classList.contains("ps-popup")) {
         settingsPopup(element);
       }
+	  else if (element.classList.contains("trainer")) {
+		  const trainer = element;
+		  const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
+		  if (revealedFarPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-far")) {
+			  setTimeout(function() {
+				  revealedFarPokemon = [...revealedPokemon];
+				  unrevealedFarTypes = calc.unrevealedTypes(revealedPokemon, false, true);
+			  }, 1);
+		  }
+		  else if (revealedNearPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-near")) {
+			 setTimeout(function() {
+				  revealedNearPokemon = [...revealedPokemon];
+				  unrevealedNearTypes = calc.unrevealedTypes(revealedPokemon, false, true);
+			  }, 1);
+		  }
+	  }
       else if (Object.keys(sprites).length !== 0 && element.hasAttribute("src")) {
         updateSprite(element);
         updateBackdrop(element);
@@ -25,8 +45,8 @@
       const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
       const hasDitto = Array.from(opposingTrainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim()).some(name => name === "Ditto");
  
-      const unrevealedTypes = calc.unrevealedTypes(revealedPokemon, hasDitto);
       var html = "<h2>Unrevealed Pokemon:</h2><p>";
+	  const unrevealedTypes = trainer.classList.contains("trainer-near") ? unrevealedNearTypes : unrevealedFarTypes;
       for (const typeProbability of unrevealedTypes) {
         html += "&nbsp;• " + util.capitalizeFirstLetter(typeProbability.type) + ": " + (typeProbability.probability*100).toFixed(0) + "%</br>";
       }

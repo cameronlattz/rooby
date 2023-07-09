@@ -209,6 +209,26 @@ const util = function() {
 
 	const battleTooltips = new BattleTooltips();
 	
+	const loadRandomsData = function(buildFunc, format) {
+		if (consts.pokemons != void 0) return new Promise();
+		const randomDataUrl = consts.randomDataUrl[format];
+		const formatsDataUrl = consts.formatsDataUrl[format];
+		return fetch("https://cors-anywhere.herokuapp.com/" + formatsDataUrl)
+			.then(response => response.text())
+			.then(formatsData => {
+				return fetch(randomDataUrl)
+				.then(response => response.json())
+				.then(randomData => {
+					let formats = util.convertTsToObject(formatsData);
+					let pokemons = [];
+					for (const pokemon in randomData) {
+						pokemons.push(pokemon);
+					}
+					buildFunc(randomData, formats);
+				})
+			});
+	}
+	
 	return {
 		battleTooltips: battleTooltips,
 		calculateProbability: calculateProbability,
@@ -216,6 +236,7 @@ const util = function() {
 		convertTsToObject: convertTsToObject,
 		generateCombinations: generateCombinations,
 		filterObject: filterObject,
+		loadRandomsData: loadRandomsData,
 		removeDuplicates: removeDuplicates
 	}
 }();

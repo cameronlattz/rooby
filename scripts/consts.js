@@ -1,4 +1,12 @@
 const consts = function() {
+	const randomDataUrl = {
+		"gen1": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/gen1/random-data.json"
+	}
+	
+	const formatsDataUrl = {
+		"gen1": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/gen1/formats-data.ts"
+	}
+	
 	const uuTiers = ["NFE", "UU", "UUBL", "NU"];
 	
 	const nuTiers = [...uuTiers, "LC"];
@@ -23054,6 +23062,7 @@ const consts = function() {
 	
 	return {
 		backdrops: backdrops,
+		formatsDataUrl: formatsDataUrl,
 		icons: icons,
 		levelScales: levelScales,
 		maxMoveCount: maxMoveCount,
@@ -23062,6 +23071,7 @@ const consts = function() {
 		nuTiers: nuTiers,
 		physicalSetupMoves: physicalSetupMoves,
 		pokedex: pokedex,
+		randomDataUrl: randomDataUrl,
 		redundantSets: redundantSets,
 		specialSetupMoves: specialSetupMoves,
 		spriteSets: spriteSets,
