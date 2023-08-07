@@ -31,12 +31,14 @@
         const trainer = element;
         const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
         if (revealedFarPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-far")) {
+          unrevealedFarTypes = [];
           (async () => {
             revealedFarPokemon = [...revealedPokemon];
             unrevealedFarTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: revealedPokemon, haveDitto: false, pokemons: consts.pokemons}});
           })();
         }
         else if (revealedNearPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-near")) {
+          unrevealedNearTypes = [];
           (async () => {
             revealedFarPokemon = [...revealedPokemon];
             unrevealedNearTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: revealedPokemon, haveDitto: false, pokemons: consts.pokemons}});
@@ -58,7 +60,8 @@
       const hasDitto = Array.from(opposingTrainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim()).some(name => name === "Ditto");
  
       var html = "<h2>Unrevealed Pokemon:</h2><p>";
-	  const unrevealedTypes = trainer.classList.contains("trainer-near") ? unrevealedNearTypes : unrevealedFarTypes;
+	    const unrevealedTypes = trainer.classList.contains("trainer-near") ? unrevealedNearTypes : unrevealedFarTypes;
+      if (unrevealedTypes.length === 0) html += "Calculating, check again soon...";
       for (const typeProbability of unrevealedTypes) {
         html += "&nbsp;• " + util.capitalizeFirstLetter(typeProbability.type) + ": " + (typeProbability.probability*100).toFixed(0) + "%</br>";
       }
