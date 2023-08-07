@@ -213,7 +213,8 @@ const util = function() {
 		if (consts.pokemons != void 0) return new Promise();
 		const randomDataUrl = consts.randomDataUrl[format];
 		const formatsDataUrl = consts.formatsDataUrl[format];
-		return fetch("https://cors-anywhere.herokuapp.com/" + formatsDataUrl)
+		//return fetch("https://cors-anywhere.herokuapp.com/" + formatsDataUrl)
+		return fetch(formatsDataUrl)
 			.then(response => response.text())
 			.then(formatsData => {
 				return fetch(randomDataUrl)

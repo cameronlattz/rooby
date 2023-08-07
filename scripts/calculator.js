@@ -1,14 +1,10 @@
-const calc = function() {
+const roobyCalc = function() {
 	let currentTypeProbabilities = [];
 	let unrevealedPokemons = {};
-
-	window.onload = function() {
-		util.loadRandomsData(buildPokemons, "gen1").then(function(data) {
-			unrevealedPokemons = calculatePokemonProbabilities([], false);
-		});
-	}
 	
 	const calculatePokemonProbabilities = function(revealedTeam, haveDitto) {
+		console.log("test");
+		window.alert("tesT");
 		const tempTeam = [];
 		for (const revealedMon of revealedTeam) {
 			const slot = {};
@@ -46,19 +42,37 @@ const calc = function() {
 								const type = pokemon.types[k];
 								if (previousPokemon.types.includes(type)) {
 									const otherSlots = tempTeam.slice(0, i - 1);
+									let isTwo = false;
 									for (let j = 0; j < otherSlots.length; j++) {
 										const otherSlot = otherSlots[j];
 										for (const otherPokemonId in otherSlot) {
 											const otherPokemon = consts.pokemons.find(p => p.id === otherPokemonId);
 											if (otherPokemon.types.includes(type)) {
-												typeProbabilities[k] = 1 - ((1 - previousSlot[previousPokemonId]) * (1 - otherSlot[otherPokemonId]));
+												isTwo = true;
+												if (revealedTeam.includes(previousPokemonId) && revealedTeam.includes(otherPokemonId)) {
+													typeProbabilities[k] = 0;
+												}
+												else if (revealedTeam.includes(previousPokemonId)) {
+													typeProbabilities[k] = 1/2 - (1 - otherSlot[otherPokemonId]);
+												}
+												else if (revealedTeam.includes(otherPokemonId)) {
+													typeProbabilities[k] = 1/2 - (1 - previousSlot[previousPokemonId]);
+												}
+												else {
+													typeProbabilities[k] = 1 - ((1 - previousSlot[previousPokemonId]) * (1 - otherSlot[otherPokemonId]));
+												}
 											}
 										}
 									}
+									if (!isTwo && revealedTeam.includes(previousPokemonId)) {
+										typeProbabilities[k] = previousSlot[previousPokemonId]/2;
+									}
 								}
 							}
-							if (typeProbabilities.length === 0) twoSameTypePreviousProbability[i] = 0;
-							else twoSameTypePreviousProbability[i] = typeProbabilities.reduce((partialSum, a) => partialSum + a, 0)/typeProbabilities.length;
+							if (typeProbabilities.length !== 0) {
+								// if revealedTeam has two types,
+								twoSameTypePreviousProbability[i] = typeProbabilities.reduce((partialSum, a) => partialSum + a, 0)/typeProbabilities.length;
+							}
 							if (previousPokemon.types.some(ppt => pokemon.types.includes(ppt))) {
 								oneSameTypePreviousProbability[i] += previousSlot[previousPokemonId];
 							}
@@ -120,7 +134,6 @@ const calc = function() {
 		for (const pokemonId in validPokemonMoveSets) {
 			const pokemonMoveSets = calculateMoveSets(validPokemonMoveSets[pokemonId]);
 			const pokemon = {
-				critRate: critRate(1), // TODO
 				id: pokemonId,
 				level: moveSets[pokemonId].level,
 				moves: calculateMoves(pokemonMoveSets),
@@ -318,61 +331,45 @@ const calc = function() {
         unrevealedMoves.sort((a, b) => b.probability - a.probability);
 		return unrevealedMoves;
 	}
-	
-	const unrevealedTypes = function(revealedMons, haveDitto, changed) {
-		if (changed) {
-			unrevealedPokemons = calculatePokemonProbabilities(revealedMons, haveDitto);
-		}
-		let validTypes = [];
-		let typeProbabilities = [];
-		for (const type in consts.typechart) {
-		  const capitalizedType = util.capitalizeFirstLetter(type);
-		  if (consts.pokemons.some(p => p.types.includes(capitalizedType))) {
-			  validTypes.push(capitalizedType);
-		  }
-		}
-		for (const type of validTypes) {
-		  const capitalizedType = util.capitalizeFirstLetter(type);
-		  let typeOdds = 1;
-		  let sameTypeCount = 0;
-		  if (consts.pokemons.some(p => p.types.includes(capitalizedType))) {
-			const unrevealedMons = [];
-			for (const unrevealedPokemon in unrevealedPokemons) {
-				const unrevealedMon = consts.pokemons.find(p => p.id === unrevealedPokemon);
-				if (unrevealedMon.types.includes(capitalizedType)) {
-					typeOdds = typeOdds * (1 - unrevealedPokemons[unrevealedPokemon]);
-					sameTypeCount++;
-				}
-			}
-			const probability = typeOdds * (sameTypeCount/consts.pokemons.length);
-			typeProbabilities.push({ type: type, probability: probability });
-		  }
-		}
-		typeProbabilities.sort((a, b) => b.probability - a.probability);
-		currentTypeProbabilities = [...typeProbabilities];
-		return typeProbabilities;
-	}
 
-	const damage = function(pokemon, opposingPokemon, healthRemaining, burned, buffs, debuffs) {
+	const damage = function(pokemon, pokemonLevel, opposingPokemon, opposingPokemonLevel, moveName, healthRemaining) {
+		const generation = calc.Generations.get(1);
+		const move = new calc.Move(generation, moveName);
+		const result = calc.calculate(
+			generation,
+			new calc.Pokemon(generation, pokemon, {level: pokemonLevel}),
+			new calc.Pokemon(generation, opposingPokemon, {level: opposingPokemonLevel}),
+			move
+		);
+		const critResult = calc.calculate(
+			generation,
+			new calc.Pokemon(generation, pokemon, {level: pokemonLevel}),
+			new calc.Pokemon(generation, opposingPokemon, {level: opposingPokemonLevel}),
+			new calc.Move(generation, moveName, {isCrit: true})
+		);
 		return {
-			minDamage: (Math.random()*25).toFixed(0),
-			maxDamage: (Math.random()*25 + 25).toFixed(0),
-			critRate: (Math.random()*25).toFixed(0),
-			critMinDamage: (Math.random()*50).toFixed(0),
-			critMaxDamage: (Math.random()*50 + 50).toFixed(0),
-			hkoChance: (Math.random()*100).toFixed(0),
-			hkoMultiple: (Math.random()*3 + 1).toFixed(0)
+			minDamage: result.damage[0]/result.defender.stats.hp,
+			maxDamage: result.damage[result.damage.length - 1]/result.defender.stats.hp,
+			critMinDamage: critResult.damage[0]/critResult.defender.stats.hp,
+			critMaxDamage: critResult.damage[critResult.damage.length - 1]/critResult.defender.stats.hp,
+			critRate: critRate(result.attacker.species.baseStats.spe, move.name),
+			//hkoChance: (Math.random()*100).toFixed(0),
+			//hkoMultiple: (Math.random()*3 + 1).toFixed(0)
 		}
 	}
 
-	const critRate = function(baseSpeed) {
-		return 1;
+	const critRate = function(baseSpeed, moveName) {
+		let moveCritDivider = 512;
+		if (moveName) {
+			const move = Object.entries(consts.moves).filter(x => x[1].name === moveName)[0][1];
+			if (move.critRatio > 1) moveCritDivider = moveCritDivider / 8;
+		}
+		return baseSpeed / moveCritDivider;
 	}
 
 	return {
 		buildPokemons: buildPokemons,
 		damage: damage,
-		unrevealedMoves: unrevealedMoves,
-		unrevealedTypes: unrevealedTypes
+		unrevealedMoves: unrevealedMoves
 	}
 }();

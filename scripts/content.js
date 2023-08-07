@@ -2,10 +2,22 @@
   const sprites = {};
   let revealedFarPokemon = [];
   let revealedNearPokemon = [];
-  let unrevealedFarTypes = {};
-  let unrevealedNearTypes = {};
+  let unrevealedFarTypes = [];
+  let unrevealedNearTypes = [];
   let backdrop;
   const doc = document;
+
+	window.onload = function() {
+		util.loadRandomsData(roobyCalc.buildPokemons, "gen1").then(function(data) {
+        (async () => {
+          unrevealedFarTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: [], haveDitto: false, pokemons: consts.pokemons}});
+        })();
+        (async () => {
+          unrevealedNearTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: [], haveDitto: false, pokemons: consts.pokemons}});
+        })();
+		});
+	}
+
   doc.addEventListener("DOMNodeInserted", (event) => {
     const element = event.target;
     if (element.classList != void 0) {
@@ -15,22 +27,22 @@
       else if (element.classList.contains("ps-popup")) {
         settingsPopup(element);
       }
-	  else if (element.classList.contains("trainer")) {
-		  const trainer = element;
-		  const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
-		  if (revealedFarPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-far")) {
-			  setTimeout(function() {
-				  revealedFarPokemon = [...revealedPokemon];
-				  unrevealedFarTypes = calc.unrevealedTypes(revealedPokemon, false, true);
-			  }, 1);
-		  }
-		  else if (revealedNearPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-near")) {
-			 setTimeout(function() {
-				  revealedNearPokemon = [...revealedPokemon];
-				  unrevealedNearTypes = calc.unrevealedTypes(revealedPokemon, false, true);
-			  }, 1);
-		  }
-	  }
+	    else if (element.classList.contains("trainer")) {
+        const trainer = element;
+        const revealedPokemon = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim());
+        if (revealedFarPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-far")) {
+          (async () => {
+            revealedFarPokemon = [...revealedPokemon];
+            unrevealedFarTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: revealedPokemon, haveDitto: false, pokemons: consts.pokemons}});
+          })();
+        }
+        else if (revealedNearPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-near")) {
+        setTimeout(function() {
+            revealedNearPokemon = [...revealedPokemon];
+            //unrevealedNearTypes = roobyCalc.unrevealedTypes(revealedPokemon, false, true);
+          }, 1000);
+        }
+	    }
       else if (Object.keys(sprites).length !== 0 && element.hasAttribute("src")) {
         updateSprite(element);
         updateBackdrop(element);
@@ -71,20 +83,27 @@
         section.className = "section";
       }
       if (tooltip.classList.contains("tooltip-move")) {
-        const moveTag = tooltip.querySelector(".section");
         section = document.createElement("p");
         section.className = "section";
-        const damageCalc = calc.damage();
-        section.innerHTML += "<div class='calculator'>Damage: " + damageCalc.minDamage + "% - " + damageCalc.maxDamage + "%<br>Crit (" + damageCalc.critRate + "%): " + 
-          damageCalc.critMinDamage + "% - " + damageCalc.critMaxDamage + "%<br>" + damageCalc.hkoChance + "% chance to " + damageCalc.hkoMultiple + "HKO</div>";
-        moveTag.before(section);
+        const moveName = tooltip.querySelector("h2").childNodes[0].nodeValue;
+        const pokemon = document.querySelector(".rstatbar strong").childNodes[0].nodeValue.trim();
+        const pokemonLevel = parseInt(document.querySelector(".rstatbar small").childNodes[0].nodeValue.trim().replace(/\D/g, ""));
+        const opposingPokemon = document.querySelector(".lstatbar strong").childNodes[0].nodeValue.trim();
+        const opposingPokemonLevel = parseInt(document.querySelector(".lstatbar small").childNodes[0].nodeValue.trim().replace(/\D/g, ""));
+        const damageCalc = roobyCalc.damage(pokemon, pokemonLevel, opposingPokemon, opposingPokemonLevel, moveName);
+        if (!isNaN(damageCalc.maxDamage)) {
+          section.innerHTML += "<div class='calculator'>Damage: " + (damageCalc.minDamage*100).toFixed(1) + "% - " + (damageCalc.maxDamage*100).toFixed(1) + "%"
+          + "<br>Crit (" + (damageCalc.critRate*100).toFixed(1) + "%): " + (damageCalc.critMinDamage*100).toFixed(1) + "% - " + (damageCalc.critMaxDamage*100).toFixed(1) + "%" 
+          //+ "<br>" + damageCalc.hkoChance + "% chance to " + damageCalc.hkoMultiple + "HKO</div>";
+          tooltip.querySelector(".section").before(section);
+        }
       }
       else {
         tooltip.appendChild(section);
         const tooltipPokemonName = tooltip.querySelector("h2").innerHTML.split("<small>")[0].trim();
         const pokemon = consts.pokemons.find(p => p.name == tooltipPokemonName);
         const clickedMoves = pokemon.moves.filter(move => section.innerHTML.indexOf(move.name + " ") !== -1);
-        const unrevealedMoves = calc.unrevealedMoves(pokemon, clickedMoves);
+        const unrevealedMoves = roobyCalc.unrevealedMoves(pokemon, clickedMoves);
         for (const move of unrevealedMoves) {
           section.innerHTML += "<div class='calculator'>• " + move.name + " <small>" + move.probability + "%</small></div>";
         }
@@ -94,6 +113,7 @@
 
   const settingsPopup = function(element) {
     const avatarButton = element.querySelector("[name='avatars']");
+    if (avatarButton == void 0) return;
     const extensionAvatarButton = avatarButton.parentNode.parentNode.querySelector(".extension-avatar");
     if (extensionAvatarButton == void 0) {
       const avatarsP = document.createElement("p");
