@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,  
     "name": "RooBY",
-    "version": "1.0",
-    "description": "Add extra functionality to Pokemon Showdown",
+    "version": "0.3",
+    "description": "Adds calculators and extra functionality to Generation 1 Pokemon Showdown",
     "icons": {
       "16": "images/icon-16.png",
       "32": "images/icon-32.png",
