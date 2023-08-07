@@ -37,10 +37,10 @@
           })();
         }
         else if (revealedNearPokemon.length !== revealedPokemon.length && element.classList.contains("trainer-near")) {
-        setTimeout(function() {
-            revealedNearPokemon = [...revealedPokemon];
-            //unrevealedNearTypes = roobyCalc.unrevealedTypes(revealedPokemon, false, true);
-          }, 1000);
+          (async () => {
+            revealedFarPokemon = [...revealedPokemon];
+            unrevealedNearTypes = await chrome.runtime.sendMessage({calc: "type", options: { revealedTeam: revealedPokemon, haveDitto: false, pokemons: consts.pokemons}});
+          })();
         }
 	    }
       else if (Object.keys(sprites).length !== 0 && element.hasAttribute("src")) {
