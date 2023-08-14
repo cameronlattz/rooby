@@ -1,13 +1,17 @@
 .tooltip .section .calculator {
     font-style: italic;
+}.tooltip .section .calculator.zero {
+    opacity: 0.7;
 }
-
+.tooltip .section .damage {
+    float: right;
+    font-style: normal;
+}
 .message-log .chat.calculator {
     background-color: lightgray;
     border: 1px solid gray;
     padding: 2px;
 }
-
 small.damage {
     display: block;
 }
