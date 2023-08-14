@@ -321,7 +321,7 @@ const roobyCalc = function() {
 		return moveSets.sort((a, b) => b.probability - a.probability);
 	}
 
-	const unrevealedMoves = function(pokemon, clickedMoves) {
+	const unrevealedMoves2 = function(pokemon, clickedMoves) {
         const validMoveSets = pokemon.moveSets.filter(ms => clickedMoves.every(cm => ms.moves.includes(cm.id)));
         const unrevealedMoves = [];
         for (const move of pokemon.moves.filter(move => !clickedMoves.includes(move))) {
@@ -330,6 +330,31 @@ const roobyCalc = function() {
         }
         unrevealedMoves.sort((a, b) => b.probability - a.probability);
 		return unrevealedMoves;
+	}
+
+	const unrevealedMoves = function(pokemon, revealedMoves) {
+		const moveSets = consts.moveSets[pokemon.id];
+		const allMoves = moveSets.map(ms => ms.moves).flat().filter((value, index, array) => array.indexOf(value) === index);
+		const possibleMoveSets = moveSets.filter(ms => revealedMoves.every(rm => ms.moves.includes(rm.id)));
+		if (possibleMoveSets.length < 1) return null;
+		const totalPercentage = possibleMoveSets.map(pms => pms.percent).reduce((a, b) => a + b);
+		possibleMoveSets.forEach((pms, index) => possibleMoveSets[index].percent = 100*pms.percent/totalPercentage);
+		const possibleMoves = possibleMoveSets.map(pms => pms.moves).flat().filter((value, index, array) => array.indexOf(value) === index);
+		const impossibleMoves = allMoves.filter(m => !possibleMoves.includes(m) && !revealedMoves.includes(m));
+		const possibleMovePercentages = possibleMoves.map(pm => ({
+			id: pm,
+			name: consts.moves[pm].name,
+			probability: possibleMoveSets.filter(pms => pms.moves.some(m => m == pm)).map(pms => pms.percent).reduce((a, b) => a + b)
+		}));
+		const impossibleMovePercentages = impossibleMoves.map(im => ({
+			id: im,
+			name: consts.moves[im].name,
+			probability: 0
+		}));
+		const movePercentages = [...possibleMovePercentages, ...impossibleMovePercentages];
+		movePercentages.sort((a, b) => b.id - a.id);
+		movePercentages.sort((a, b) => b.probability - a.probability)
+		return movePercentages;
 	}
 
 	const damage = function(pokemon, pokemonLevel, opposingPokemon, opposingPokemonLevel, moveName, healthRemaining) {

@@ -6,6 +6,7 @@
   let unrevealedNearTypes = [];
   let backdrop;
   const doc = document;
+  let hovered = "opponent";
 
 	window.onload = function() {
 		util.loadRandomsData(roobyCalc.buildPokemons, "gen1").then(function(data) {
@@ -22,10 +23,10 @@
     const element = event.target;
     if (element.classList != void 0) {
       if (element.classList.contains("tooltipinner")) {
-        tooltipCalculations(element);
+        setTimeout(function() {tooltipCalculations(element)}, 1);
       }
       else if (element.classList.contains("ps-popup")) {
-        settingsPopup(element);
+        //settingsPopup(element);
       }
 	    else if (element.classList.contains("trainer")) {
         const trainer = element;
@@ -75,10 +76,19 @@
         element.setAttribute("title", "Not revealed");
       });
     }
+    else if (event.target.closest(".rightbar") != void 0) {
+      hovered = "opponent";
+    }
+    else if (event.target.closest(".leftbar") != void 0) {
+      hovered = "self";
+    }
+    else {
+      hovered = null;
+    }
   });
 
   const tooltipCalculations = function(element) {
-    const tooltip = element.querySelector(".tooltip-pokemon, .tooltip-activepokemon, .tooltip-move");
+    const tooltip = element.querySelector(".tooltip-pokemon, .tooltip-activepokemon, .tooltip-switchpokemon, .tooltip-move");
     if (tooltip != void 0) {
       let section = element.querySelector(".section");
       if (section == void 0) {
@@ -105,12 +115,54 @@
         tooltip.appendChild(section);
         const tooltipPokemonName = tooltip.querySelector("h2").innerHTML.split("<small>")[0].trim();
         const pokemon = consts.pokemons.find(p => p.name == tooltipPokemonName);
-        const clickedMoves = pokemon.moves.filter(move => section.innerHTML.indexOf(move.name + " ") !== -1);
-        const unrevealedMoves = roobyCalc.unrevealedMoves(pokemon, clickedMoves);
-        for (const move of unrevealedMoves) {
-          section.innerHTML += "<div class='calculator'>• " + move.name + " <small>" + move.probability + "%</small></div>";
+        const pokemonLevel = parseInt(tooltip.querySelector("h2 small").childNodes[0].nodeValue.trim().replace(/\D/g, ""));
+        let doDamageCalc = false;
+        let opposingPokemon;
+        let opposingPokemonLevel;
+        let opponentSelector = ".rstatbar";
+        if (hovered !== "opponent") opponentSelector = ".lstatbar";
+        if (document.querySelector(opponentSelector + " strong") != void 0) {
+          doDamageCalc = true;
+          const opposingPokemonName = document.querySelector(opponentSelector + " strong").childNodes[0].nodeValue.trim();
+          opposingPokemon = consts.pokemons.find(p => p.name == opposingPokemonName);
+          opposingPokemonLevel = parseInt(document.querySelector(opponentSelector + " small").childNodes[0].nodeValue.trim().replace(/\D/g, ""));
         }
-      }
+        const clickedMoves = pokemon.moves.filter(move => section.innerHTML.indexOf(move.name + " ") !== -1);
+        let unrevealedMoves = roobyCalc.unrevealedMoves(pokemon, clickedMoves);
+        unrevealedMoves = unrevealedMoves.filter(um => !clickedMoves.some(cm => cm.id == um.id));
+        const revealedMoveElements = Array.prototype.slice.call(section.childNodes).filter(cn => cn.nodeName === "#text");
+        for (const revealedMoveElement of revealedMoveElements) {
+          const revealedMoveName = revealedMoveElement.nodeValue.trim().substring(2);
+          const damageCalc = roobyCalc.damage(pokemon.id, pokemonLevel, opposingPokemon.id, opposingPokemonLevel, revealedMoveName);
+          if (!isNaN(damageCalc.maxDamage) && revealedMoveName !== "Counter" && !tooltip.classList.contains("tooltip-activepokemon")) {
+            if (tooltip.classList.contains("tooltip-switchpokemon")) {
+              const damageSpan = document.createElement("span");
+              damageSpan.className = "damage";
+              damageSpan.innerHTML = (damageCalc.minDamage*100).toFixed(1) + "%-" + (damageCalc.maxDamage*100).toFixed(1) + "%";
+              revealedMoveElement.parentElement.insertBefore(damageSpan, revealedMoveElement.nextSibling);
+            }
+            else {
+              revealedMoveElement.nextSibling.innerHTML += " <span class='damage'>" + (damageCalc.minDamage*100).toFixed(1) + "%-" + (damageCalc.maxDamage*100).toFixed(1) + "%</span>";
+            }
+          }
+        }
+        if (!tooltip.classList.contains("tooltip-switchpokemon")) {
+          for (const move of unrevealedMoves) {
+            const probability = Math.round(move.probability * 100)/100;
+            let className = "calculator";
+            if (probability == 0) className += " zero";
+            let moveString = "<div class='" + className + "'>• " + move.name + " <small>" + probability + "%";
+            if (doDamageCalc) {
+              const damageCalc = roobyCalc.damage(pokemon.id, pokemonLevel, opposingPokemon.id, opposingPokemonLevel, move.name);
+              if (!isNaN(damageCalc.maxDamage) && move.name !== "Counter" && !tooltip.classList.contains("tooltip-activepokemon")) {
+                moveString += " <span class='damage'>" + (damageCalc.minDamage*100).toFixed(1) + "%-" + (damageCalc.maxDamage*100).toFixed(1) + "%</span>";
+              }
+            }
+            moveString += "</small></div>";
+            section.innerHTML += moveString;
+          }
+        }
+        }
     }
   }
 
