@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,  
     "name": "RooBY",
-    "version": "0.3",
+    "version": "0.4",
     "description": "Adds calculators and extra functionality to Generation 1 Pokemon Showdown",
     "icons": {
       "16": "images/icon-16.png",
@@ -15,7 +15,7 @@
     },
     "content_scripts": [
       {
-        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/calculator.js", "scripts/content.js"],
+        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/constantMovesets.js", "scripts/calculator.js", "scripts/content.js"],
         "css": ["styles/style.css"],
         "matches": [
           "https://play.pokemonshowdown.com/*"
