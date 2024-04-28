@@ -1,1 +1,2 @@
-import './typeCalculator.js'
+import './consts.js';
+import './typeCalculator.js';

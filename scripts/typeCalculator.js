@@ -1,569 +1,560 @@
-let unrevealedPokemons = [];
-let currentTypeProbabilities = [];
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.calc === "type") {
-        const types = unrevealedTypes(message.options.revealedTeam, message.options.haveDitto, true, message.options.pokemons);
-        sendResponse(types);
-    }
-    return true;
-});
-
-const uuTiers = ["NFE", "UU", "UUBL", "NU"];
-	
-const nuTiers = [...uuTiers, "LC"];
-
-const maxTeamSize = 6;
-	
-const typechart = {
-    bug: {
-        damageTaken: {
-            Bug: 0,
-            Dragon: 0,
-            Electric: 0,
-            Fighting: 2,
-            Fire: 1,
-            Flying: 1,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 2,
-            Ice: 0,
-            Normal: 0,
-            Poison: 1,
-            Psychic: 0,
-            Rock: 1,
-            Water: 0
-        }
-    },
-    dark: {
-        damageTaken: {
-            prankster: 3,
-            Bug: 1,
-            Dark: 2,
-            Dragon: 0,
-            Electric: 0,
-            Fairy: 1,
-            Fighting: 1,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 2,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 3,
-            Rock: 0,
-            Steel: 0,
-            Water: 0,
-        }
-    },
-    dragon: {
-        damageTaken: {
-            Bug: 0,
-            Dark: 0,
-            Dragon: 1,
-            Electric: 2,
-            Fairy: 1,
-            Fighting: 0,
-            Fire: 2,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 0,
-            Ice: 1,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 0,
-            Water: 2,
-        }
-    },
-    electric: {
-        damageTaken: {
-            par: 3,
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 2,
-            Fairy: 0,
-            Fighting: 0,
-            Fire: 0,
-            Flying: 2,
-            Ghost: 0,
-            Grass: 0,
-            Ground: 1,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 2,
-            Water: 0
-        }
-    },
-    fairy: {
-        damageTaken: {
-            Bug: 2,
-            Dark: 2,
-            Dragon: 3,
-            Electric: 0,
-            Fairy: 0,
-            Fighting: 2,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 0,
-            Poison: 1,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 1,
-            Water: 0
-        }
-    },
-    fighting: {
-        damageTaken: {
-            Bug: 2,
-            Dark: 2,
-            Dragon: 0,
-            Electric: 0,
-            Fairy: 1,
-            Fighting: 0,
-            Fire: 0,
-            Flying: 1,
-            Ghost: 0,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 1,
-            Rock: 2,
-            Steel: 0,
-            Water: 0
-        }
-    },
-    fire: {
-        damageTaken: {
-            Bug: 2,
-            Dragon: 0,
-            Electric: 0,
-            Fighting: 0,
-            Fire: 2,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 1,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 1,
-            Water: 1
-        }
-    },
-    flying: {
-        damageTaken: {
-            Bug: 2,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 1,
-            Fairy: 0,
-            Fighting: 2,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 3,
-            Ice: 1,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 1,
-            Steel: 0,
-            Water: 0
-        }
-    },
-    ghost: {
-        damageTaken: {
-            Bug: 2,
-            Dragon: 0,
-            Electric: 0,
-            Fighting: 3,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 1,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 3,
-            Poison: 2,
-            Psychic: 0,
-            Rock: 0,
-            Water: 0
-        }
-    },
-    grass: {
-        damageTaken: {
-            powder: 3,
-            Bug: 1,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 2,
-            Fairy: 0,
-            Fighting: 0,
-            Fire: 1,
-            Flying: 1,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 2,
-            Ice: 1,
-            Normal: 0,
-            Poison: 1,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 0,
-            Water: 2
-        }
-    },
-    ground: {
-        damageTaken: {
-            sandstorm: 3,
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 3,
-            Fairy: 0,
-            Fighting: 0,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 1,
-            Ground: 0,
-            Ice: 1,
-            Normal: 0,
-            Poison: 2,
-            Psychic: 0,
-            Rock: 2,
-            Steel: 0,
-            Water: 1
-        }
-    },
-    ice: {
-        damageTaken: {
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 0,
-            Fairy: 0,
-            Fighting: 1,
-            Fire: 1,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 0,
-            Ground: 0,
-            Ice: 2,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 1,
-            Steel: 1,
-            Water: 0
-        }
-    },
-    normal: {
-        damageTaken: {
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 0,
-            Fairy: 0,
-            Fighting: 1,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 3,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 0,
-            Water: 0
-        }
-    },
-    poison: {
-        damageTaken: {
-            psn: 3,
-            tox: 3,
-            Bug: 1,
-            Dragon: 0,
-            Electric: 0,
-            Fighting: 2,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 1,
-            Ice: 0,
-            Normal: 0,
-            Poison: 2,
-            Psychic: 1,
-            Rock: 0,
-            Water: 0
-        }
-    },
-    psychic: {
-        damageTaken: {
-            Bug: 1,
-            Dragon: 0,
-            Electric: 0,
-            Fighting: 2,
-            Fire: 0,
-            Flying: 0,
-            Ghost: 3,
-            Grass: 0,
-            Ground: 0,
-            Ice: 0,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 2,
-            Rock: 0,
-            Water: 0
-        }
-    },
-    rock: {
-        damageTaken: {
-            sandstorm: 3,
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 0,
-            Fairy: 0,
-            Fighting: 1,
-            Fire: 2,
-            Flying: 2,
-            Ghost: 0,
-            Grass: 1,
-            Ground: 1,
-            Ice: 0,
-            Normal: 2,
-            Poison: 2,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 1,
-            Water: 1
-        }
-    },
-    steel: {
-        damageTaken: {
-            psn: 3,
-            tox: 3,
-            sandstorm: 3,
-            Bug: 2,
-            Dark: 0,
-            Dragon: 2,
-            Electric: 0,
-            Fairy: 2,
-            Fighting: 1,
-            Fire: 1,
-            Flying: 2,
-            Ghost: 0,
-            Grass: 2,
-            Ground: 1,
-            Ice: 2,
-            Normal: 2,
-            Poison: 3,
-            Psychic: 2,
-            Rock: 2,
-            Steel: 2,
-            Water: 0
-        }
-    },
-    water: {
-        damageTaken: {
-            Bug: 0,
-            Dark: 0,
-            Dragon: 0,
-            Electric: 1,
-            Fairy: 0,
-            Fighting: 0,
-            Fire: 2,
-            Flying: 0,
-            Ghost: 0,
-            Grass: 1,
-            Ground: 0,
-            Ice: 2,
-            Normal: 0,
-            Poison: 0,
-            Psychic: 0,
-            Rock: 0,
-            Steel: 2,
-            Water: 2
-        }
-    }
-};
-
-const calculatePokemonProbabilities = function(revealedTeam, haveDitto, pokemons) {
-    const tempTeam = [];
-    for (const revealedMon of revealedTeam) {
-        const slot = {};
-        for (const pokemon of pokemons) {
-            slot[pokemon.id] = (revealedMon === pokemon.name ? 1 : 0);
-        }
-        tempTeam.push(slot);
-    }
-    for (let index = revealedTeam.length; index < maxTeamSize; index++) {
-        const slot = {};
-        let totalProbabilities = 0;
-        for (const pokemon of pokemons) {
-            if (revealedTeam.includes(pokemon.id)) {
-                slot[pokemon.id] = 0;
-                continue;
+(function() {
+    "use strict";
+    const {onMessage} = chrome.runtime, {addListener} = onMessage; 
+    onMessage.addListener = fn => addListener.call(onMessage, (msg, sender, respond) => {
+        const res = fn(msg, sender, respond);
+        if (res instanceof Promise) return !!res.then(respond, void 0);
+        if (res !== undefined) respond(res);
+    });
+    onMessage.addListener(
+        async function(request, sender, sendResponse) {
+            if (request.args != null) {
+                if (request.function !== "init" && _pokemons == void 0 && request.args.pokemons != void 0) {
+                    await init(request.args.pokemons);
+                }
+                if (request.function === "calculate" && request.args.currentTeamNumbers !== null && request.args.currentTeamNumbers.length < consts.maxTeamSize) {
+                    const odds = await getOdds(request.args, "types", true);
+                    const opponentHasDitto = (request.args.opponentPokemonNumbers != void 0 && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
+                    const dittoCurrentTeamNumbers = request.args.currentTeamNumbers + (opponentHasDitto ? "DITTO" : "");
+                    sendResponse({currentTeamNumbers: dittoCurrentTeamNumbers, odds: odds});
+                }
+                else if (request.function === "simulate" && request.args.currentTeamNumbers !== null) {
+                    const odds = await getOdds(request.args, request.args.type, false);
+                    const opponentHasDitto = (request.args.opponentPokemonNumbers != void 0 && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
+                    const dittoCurrentTeamNumbers = request.args.currentTeamNumbers + (opponentHasDitto ? "DITTO" : "");
+                    sendResponse({currentTeamNumbers: dittoCurrentTeamNumbers, odds: odds, simulations: request.args.simulations});
+                }
+                else if (request.function === "prune" && request.args.saveMonNumbers !== null) {
+                    deleteTrees(request.args.saveMonNumbers);
+                    await pruneOddsStorage(request.args.saveMonNumbers);
+                    sendResponse(true);
+                }
+                else if (request.function === "init" && request.args.pokemons != null) {
+                    _trees = {};
+                    await init(request.args.pokemons);
+                    const odds = await getOdds(request.args, "types", true);
+                    sendResponse(odds);
+                }
+                else if (request.function === "keepAlive") {
+                    sendResponse(true);
+                }
             }
-            slot[pokemon.id] = 1;
-            if (pokemon.id === "ditto") haveDitto ? 0 : slot[pokemon.id] = slot[pokemon.id]/2;
-            else if (pokemon.tier === "NFE" || pokemon.tier === "LC") slot[pokemon.id] = slot[pokemon.id]/2; // if NFE or LC, cut odds in half
-            if (tempTeam.length > 0) {
-                const emptyArray = tempTeam.map(p => 0);
-                let totalPreviousProbability = [...emptyArray];
-                let oneSameTypePreviousProbability = [...emptyArray];
-                let twoSameTypePreviousProbability = [...emptyArray];
-                let twoWeakPreviousProbability = [...emptyArray];
-                let uberTierPreviousProbability = [...emptyArray];
-                let nuTierPreviousProbability = [...emptyArray];
-                for (let i = 0; i < tempTeam.length; i++) {
-                    const previousSlot = tempTeam[i];
-                    for (const previousPokemonId in previousSlot) {
-                        const previousPokemon = pokemons.find(p => p.id === previousPokemonId);
-                        totalPreviousProbability[i] += previousSlot[previousPokemonId];
-                        const typeProbabilities = [];
-                        for (let k = 0; k < pokemon.types.length; k++) {
-                            const type = pokemon.types[k];
-                            if (previousPokemon.types.includes(type)) {
-                                const otherSlots = tempTeam.slice(0, i - 1);
-                                let isTwo = false;
-                                for (let j = 0; j < otherSlots.length; j++) {
-                                    const otherSlot = otherSlots[j];
-                                    for (const otherPokemonId in otherSlot) {
-                                        const otherPokemon = pokemons.find(p => p.id === otherPokemonId);
-                                        if (otherPokemon.types.includes(type)) {
-                                            isTwo = true;
-                                            if (revealedTeam.includes(previousPokemonId) && revealedTeam.includes(otherPokemonId)) {
-                                                typeProbabilities[k] = 0;
-                                            }
-                                            else if (revealedTeam.includes(previousPokemonId)) {
-                                                typeProbabilities[k] = 1/2 - (1 - otherSlot[otherPokemonId]);
-                                            }
-                                            else if (revealedTeam.includes(otherPokemonId)) {
-                                                typeProbabilities[k] = 1/2 - (1 - previousSlot[previousPokemonId]);
-                                            }
-                                            else {
-                                                typeProbabilities[k] = 1 - ((1 - previousSlot[previousPokemonId]) * (1 - otherSlot[otherPokemonId]));
-                                            }
-                                        }
-                                    }
-                                }
-                                if (!isTwo && revealedTeam.includes(previousPokemonId)) {
-                                    typeProbabilities[k] = previousSlot[previousPokemonId]/2;
-                                }
-                            }
-                        }
-                        if (typeProbabilities.length !== 0) {
-                            // if revealedTeam has two types,
-                            twoSameTypePreviousProbability[i] = typeProbabilities.reduce((partialSum, a) => partialSum + a, 0)/typeProbabilities.length;
-                        }
-                        if (previousPokemon.types.some(ppt => pokemon.types.includes(ppt))) {
-                            oneSameTypePreviousProbability[i] += previousSlot[previousPokemonId];
-                        }
-                        // do weakness check
-                        if (previousPokemon.tier === "Uber") {
-                            uberTierPreviousProbability[i] += previousSlot[previousPokemonId];
-                        }
-                        else if (nuTiers.includes(previousPokemon.tier)) {
-                            nuTierPreviousProbability[i] += previousSlot[previousPokemonId];
+        }
+    );
+
+    let _pokemons;
+    let _trees = {};
+    let _odds = {};
+    let _lockedNumbers = [];
+
+    let _level100PokemonNumbers;
+    let _sleepProbabilityByPokemon;
+    let _paralyzeProbabilityByPokemon;
+    let _pokemonIdByNumber = {};
+    let _pokemonNameByNumber = {};
+    let _pokemonTypesByNumber = {};
+    let _pokemonNumbersByType = {};
+    let _pokemonNumbersByTypeWeakness = {};
+    let _spammableWeaknessesByPokemon = {};
+    let _dittoNumber;
+
+    const consts = chrome.extension.consts;
+
+    const init = async function(pokemons) {
+        const saved = saveStorage("pokemons", pokemons);
+        pruneOddsStorage([]);
+        const capitalizeFirstLetter = function(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+        const types = pokemons.map(p => p.types).flat().filter((value, index, array) => array.indexOf(value) === index);
+        _pokemons = pokemons;
+        _level100PokemonNumbers = pokemons.filter(p => p.level === 100).map(p => p.number);
+        _pokemonIdByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.id}), {});
+        _pokemonNameByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.name}), {});
+        _pokemonTypesByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.types}), {});
+        _pokemonNumbersByType = types
+            .reduce((a, t) => ({ ...a, [t]: pokemons
+                .filter(p => p.types.includes(t))
+                .map(p => p.number)}), {});
+        _pokemonNumbersByTypeWeakness = consts.spammableTypes
+            .map(t => capitalizeFirstLetter(t))
+            .reduce((a, t) => ({ ...a, [t]: pokemons
+                .filter(p => isWeakTo(p.types, t))
+                .map(p => p.number)}), {});
+        _spammableWeaknessesByPokemon = pokemons
+            .reduce((a, p) => ({ ...a, [p.id]: consts.spammableTypes
+                .map(t => capitalizeFirstLetter(t))
+                .filter(t => isWeakTo(p.types, t))}), {});
+        const sleepMoves = Object.keys(consts.moves).filter(m => consts.moves[m].status === "slp");
+        _sleepProbabilityByPokemon = pokemons
+            .filter(p => p.moves.some(m => sleepMoves.includes(m.id)))
+            .reduce((a, p, i) => ({ ...a, [p.number]: p.moves.filter(m => sleepMoves.includes(m.id))[0].probability}), {});
+        const paralyzeMoves = Object.keys(consts.moves).filter(m => consts.moves[m].status === "par");
+        _paralyzeProbabilityByPokemon = pokemons
+            .filter(p => p.moves.some(m => paralyzeMoves.includes(m.id)))
+            .reduce((a, p, i) => ({ ...a, [p.number]: p.moves.filter(m => paralyzeMoves.includes(m.id))[0].probability}), {});
+        _dittoNumber = pokemons.find(p => p.id === "ditto").number;
+        await saved;
+    }
+
+    const isWeakTo = function(types, type) {
+        const weaknesses = types.filter((t) => {
+            return consts.typechart[t.toLowerCase()].damageTaken[type.toLowerCase()] === 1;
+        });
+        const resistances = types.filter((t) => {
+            const damageTaken = consts.typechart[t.toLowerCase()].damageTaken[type.toLowerCase()];
+            return [2,3].includes(damageTaken);
+        });
+        return weaknesses.length - resistances.length > 0;
+    }
+
+    const getStorage = async (storageKey, key) => {
+        let result = await chrome.storage.local.get([storageKey]);
+        if (key == void 0) result = result[storageKey];
+        else if (result[storageKey] != void 0) result = result[storageKey][key];
+        return result;
+    }
+
+    const saveStorage = async function(storageKey, arg1, arg2) {
+        if (storageKey == void 0 || arg1 == void 0) return false;
+        let storageValues = await getStorage(storageKey);
+        if (arg2 == void 0) {
+            storageValues = arg1;
+        }
+        else {
+            if (storageValues == void 0) storageValues = {};
+            storageValues[arg1] = arg2;
+        }
+        await chrome.storage.local.set({[storageKey]: storageValues});
+    }
+
+    const deleteStorage = async function(storageKey, value) {
+        let storageValues = await getStorage(storageKey);
+        if (storageValues == void 0) return false;
+        if (value == void 0) {
+            storageValues = {};
+        }
+        else {
+            if (storageValues[value] == void 0) return false;
+            delete storageValues[value];
+        }
+        await chrome.storage.local.set({key: storageValues});
+        return true;
+    }
+
+    const pruneOddsStorage = async function(saveMonNumbers) {
+        const allStoredOdds = await getStorage("odds") || {};
+        const storedOddsMonNumbers = Object.keys(allStoredOdds);
+        const allPossibleSaveMonNumbers = saveMonNumbers.map(smn => smn.map((_, i) => smn.slice(0, i + 1))).flat(1);
+        const saveMons = allPossibleSaveMonNumbers.map(smn => smn.sort((a, b) => a - b).join(","));
+        const currentTime = Date.now();
+        const storedOrSaveMonNumbers = saveMonNumbers.length !== 0
+            ? storedOddsMonNumbers.filter(m => saveMons.includes(m))
+            : storedOddsMonNumbers.filter(m => allStoredOdds[m].time != void 0 && allStoredOdds[m].time > currentTime - 7200000);
+        const newStoredOdds = {};
+        for (const monNumbers of storedOrSaveMonNumbers) {
+            newStoredOdds[monNumbers] = allStoredOdds[monNumbers];
+        }
+        const oddsMonNumbers = Object.keys(_odds);
+        const deleteMonNumbers = oddsMonNumbers.filter(m => !saveMons.includes(m) && m.startsWith("NONE"));
+        for (const monNumbers of deleteMonNumbers) {
+            delete _odds[monNumbers];
+        }
+        await chrome.storage.local.set({"odds": newStoredOdds});
+        return true;
+    }
+
+    const getPokemons = async function() {
+        return _pokemons || await getStorage("pokemons");
+    }
+
+    const getStoredOdds = async function(monNumbers) {
+        if (_odds[monNumbers] != void 0) {
+            return _odds[monNumbers];
+        }
+        const timedOdds = await getStorage("odds", monNumbers);
+        return timedOdds?.odds;
+    }
+
+    const saveStoredOdds = async function(monNumbers, odds) {
+        const allOdds = await chrome.storage.local.get(["odds"]);
+        if (allOdds == void 0) {
+            return;
+        }
+        await saveStorage("odds", monNumbers, {time: Date.now(), odds: odds});
+    }
+
+    const getTree = function(monNumbers) {
+        return cloneTree(_trees[monNumbers]);
+    }
+
+    const saveTree = function(monNumbers, tree) {
+        _trees[monNumbers] = tree;
+    }
+
+    const deleteTree = function(monNumbers) {
+        if (_trees[monNumbers]) delete _trees[monNumbers];
+    }
+
+    const deleteTrees = function(saveMonNumbers) {
+        const treeMonNumbers = Object.keys(_trees);
+        const saveMons = saveMonNumbers.map(smn => smn.sort((a, b) => a - b).join(","));
+        const deleteMonNumbers = treeMonNumbers.filter(m => !saveMons.includes(m));
+        for (const monNumbers of deleteMonNumbers) {
+            deleteTree(monNumbers);
+        }
+    }
+
+    const cloneTree = function(tree) {
+        if (tree == void 0) return tree;
+        const clone = (tree) => tree.map(branch => Array.isArray(branch) ? clone(branch) : branch);
+        return clone(tree);
+    }
+
+    const updateTree = function(tree, currentTeamNumbers, opponentHasDitto) {
+        if (Array.isArray(tree[1])) {
+            for (const currentTeamNumber of currentTeamNumbers) {
+                for (const leaf of tree) {
+                    if (currentTeamNumber === leaf[0] || (opponentHasDitto && leaf[0] === _dittoNumber)) {
+                        tree = leaf.slice(1);
+                    }
+                }
+            }
+        }
+        return tree;
+    }
+
+    const buildTeamTree = async function(currentTeamNumbers, opponentHasDitto) {
+        const treeArray = [];
+        const pokemons = (await getPokemons()).filter(p => !currentTeamNumbers.includes(p.number));
+        for (let pokemon4 of pokemons) {
+            if (!isValid(pokemon4, currentTeamNumbers, opponentHasDitto)) continue;
+            const slot4 = [pokemon4.number];
+            currentTeamNumbers.push(pokemon4.number);
+            for (let pokemon5 of pokemons) {
+                if (!isValid(pokemon5, currentTeamNumbers, opponentHasDitto)) continue;
+                const slot5 = [pokemon5.number];
+                currentTeamNumbers.push(pokemon5.number);
+                for (let pokemon6 of pokemons) {
+                    if (!isValid(pokemon6, currentTeamNumbers, opponentHasDitto)) continue;
+                    slot5.push(pokemon6.number);
+                }
+                slot4.push(slot5);
+                currentTeamNumbers.pop();
+            }
+            treeArray.push(slot4);
+            currentTeamNumbers.pop();
+        }
+        return treeArray;
+    }
+
+    const getOdds = async function(args, type, doSave) {
+        const teamNumbers = (args.currentTeamNumbers || []);
+        const first3TeamMembers = teamNumbers.slice(0, 3).sort((a, b) => a - b);
+        const remainingTeamMembers = teamNumbers.slice(3);
+        const currentTeamNumbers = teamNumbers.sort((a, b) => a - b);
+        let monNumbers = currentTeamNumbers.join(",");
+        const opponentHasDitto = ((args.opponentPokemonNumbers || []).includes(_dittoNumber) || args.hiddenDitto === true) && !currentTeamNumbers.includes(_dittoNumber);
+        const storedOddsKey = monNumbers + (opponentHasDitto ? "DITTO" : "");
+        let odds = doSave ? await getStoredOdds(storedOddsKey) : {};
+        if (odds == void 0 || Object.keys(odds).length === 0 && !_lockedNumbers.includes(currentTeamNumbers)) {
+            if (currentTeamNumbers.length >= 5 && args.simulations == void 0) {
+                const first3MonNumbers = first3TeamMembers.join(",") + (opponentHasDitto ? "DITTO" : "");
+                let tree = getTree(first3MonNumbers);
+                const noTree = tree == void 0;
+                _lockedNumbers.push(storedOddsKey);
+                if (noTree) {
+                    tree = await buildTeamTree(first3TeamMembers, opponentHasDitto);
+                    if (tree == void 0) return false;
+                    if (doSave) saveTree(first3MonNumbers, tree);
+                    odds = await buildOdds(tree, type);
+                    if (currentTeamNumbers.length !== 3) _odds[first3MonNumbers] = odds;
+                }
+                if (currentTeamNumbers.length !== 3) {
+                    tree = updateTree(tree, remainingTeamMembers, opponentHasDitto);
+                }
+                if (!noTree || currentTeamNumbers.length !== 3) odds = await buildOdds(tree, type, currentTeamNumbers);
+                _odds[storedOddsKey] = odds;
+                _lockedNumbers.splice(_lockedNumbers.indexOf(storedOddsKey), 1);
+                if (currentTeamNumbers.length >= 5 && doSave) {
+                    deleteTree(first3MonNumbers);
+                }
+            }
+            else {
+                _lockedNumbers.push(storedOddsKey);
+                const simulationCount = args.simulations ?? consts.defaultSimulations*(doSave ? 1 : 4);
+                odds = await buildOdds(simulationCount, type, currentTeamNumbers, opponentHasDitto);
+                _odds[storedOddsKey] = odds;
+                _lockedNumbers.splice(_lockedNumbers.indexOf(currentTeamNumbers), 1);
+            }
+            if (doSave) await saveStoredOdds(storedOddsKey, odds);
+        }
+        _odds[storedOddsKey] = odds;
+        return odds;
+    }
+
+    const buildOdds = async function(treeOrSimulationCount, type, currentTeamNumbers, opponentHasDitto) {
+        const odds = {};
+        const pokemons = await getPokemons();
+        if (pokemons == void 0) return;
+        if (type === "pokemon") {
+            for (const pokemon of pokemons) {
+                odds[pokemon.name] = 0;
+            }
+        }
+        else {
+            odds["Sleep"] = 0;
+            odds["Paralysis"] = 0;
+            if (type === "dual types") {
+                const dualTypes = pokemons.map(p => p.types.sort().join("/")).filter((value, index, array) => array.indexOf(value) === index);
+                for (const dualType of dualTypes) {
+                    odds[dualType] = 0;
+                }
+            }
+            else {
+                const types = pokemons.map(p => p.types).flat().filter((value, index, array) => array.indexOf(value) === index);
+                for (const type of types) {
+                    odds[type] = 0;
+                }
+            }
+        }
+        const calculatedOdds = !isNaN(treeOrSimulationCount)
+            ? getOddsFromSimulations(treeOrSimulationCount, type, currentTeamNumbers, pokemons, opponentHasDitto)
+            : getOddsFromTree(treeOrSimulationCount, type);
+        for (const type in calculatedOdds) {
+            odds[type] = calculatedOdds[type];
+        }
+        return odds;
+    }
+
+    const getOddsFromTree = function(tree, type) {
+        
+        const buildTreeOdds = function(tree, type) {
+            const addPokemonsToTotal = function(currentPokemonNumbers, newPokemonNumbers, type, odds) {
+                for (const newPokemonNumber of newPokemonNumbers) {
+                    odds = updateOdds([...currentPokemonNumbers, newPokemonNumber], type, odds);
+                }
+                return newPokemonNumbers.length;
+            }
+        
+            let teams = 0;
+            let odds = {};
+            if (Array.isArray(tree[0])) {
+                for (const firstBranch of tree) {
+                    const firstBranchChildren = firstBranch.slice(1);
+                    if (Array.isArray(firstBranchChildren[0])) {
+                        for (const secondBranch of firstBranchChildren) {
+                            const secondBranchChildren = secondBranch.slice(1);
+                            teams += addPokemonsToTotal([firstBranch[0], secondBranch[0]], secondBranchChildren, type, odds);
                         }
                     }
-                    oneSameTypePreviousProbability[i] = (oneSameTypePreviousProbability[i] - twoSameTypePreviousProbability[i]) / totalPreviousProbability[i];
-                    twoSameTypePreviousProbability[i] = twoSameTypePreviousProbability[i] / totalPreviousProbability[i];
-                    twoWeakPreviousProbability[i] = twoWeakPreviousProbability[i] / totalPreviousProbability[i];
-                    uberTierPreviousProbability[i] = uberTierPreviousProbability[i] / totalPreviousProbability[i];
-                    nuTierPreviousProbability[i] = nuTierPreviousProbability[i] / totalPreviousProbability[i];
+                    else {
+                        teams += addPokemonsToTotal([firstBranch[0]], firstBranchChildren, type, odds);
+                    }
                 }
-                const oneSameTypeOdds = oneSameTypePreviousProbability.reduce((partialSum, a) => partialSum + a, 0)/oneSameTypePreviousProbability.length;
-                const twoSameTypeOdds = twoSameTypePreviousProbability.reduce((partialSum, a) => partialSum + a, 0)/twoSameTypePreviousProbability.length;
-                const twoWeakOdds = twoWeakPreviousProbability.reduce((partialSum, a) => partialSum + a, 0)/twoWeakPreviousProbability.length;
-                const uberTierOdds = uberTierPreviousProbability.reduce((partialSum, a) => partialSum + a, 0)/uberTierPreviousProbability.length;
-                const nuTierOdds = nuTierPreviousProbability.reduce((partialSum, a) => partialSum + a, 0)/nuTierPreviousProbability.length;
-                if (pokemon.tier === "LC" || pokemon.tier == "NFE") {
-                    if (tempTeam.length > 3) slot[pokemon.id] = slot[pokemon.id] * (1 - nuTierOdds);
-                }
-                else if (pokemon.tier === "Uber") {
-                    slot[pokemon.id] = slot[pokemon.id] * (1 - uberTierOdds);
-                }
-                else if (tempTeam.length > 3 && uuTiers.includes(pokemon.tier)) {
-                    slot[pokemon.id] = slot[pokemon.id] * (1 - nuTierOdds/2);
-                }
-                slot[pokemon.id] = slot[pokemon.id] * (1 - oneSameTypeOdds/2) * (1 - twoSameTypeOdds) * (1 - twoWeakOdds);
             }
-            totalProbabilities += slot[pokemon.id];
+            else {
+                teams += addPokemonsToTotal([], tree, type, odds);
+            }
+            return {teams, odds};
         }
-        for (const pokemonId in slot) {
-            slot[pokemonId] = (1/totalProbabilities)*slot[pokemonId];
-        }
-        tempTeam.push(slot);
-    }
-    const result = {};
-    for (const pokemon of pokemons) {
-        let totalProbability = 0;
-        for (const slot of tempTeam) {
-            totalProbability += slot[pokemon.id];
-        }
-        result[pokemon.id] = totalProbability/tempTeam.length;
-    }
-    return result;
-}
 
-const capitalizeFirstLetter = function(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-	
-const unrevealedTypes = function(revealedMons, haveDitto, changed, pokemons) {
-    if (!changed) {
-        return currentTypeProbabilities;
+        let {teams, odds} = buildTreeOdds(tree, type);
+        const finalOdds = finalizeOdds(odds, teams, tree.length);
+        return finalOdds;
     }
-    unrevealedPokemons = calculatePokemonProbabilities(revealedMons, haveDitto, pokemons);
-    let validTypes = [];
-    let typeProbabilities = [];
-    for (const type in typechart) {
-      const capitalizedType = capitalizeFirstLetter(type);
-      if (pokemons.some(p => p.types.includes(capitalizedType))) {
-          validTypes.push(capitalizedType);
-      }
+
+    const getOddsFromSimulations = function(simulationCount, type, currentTeamNumbers = [], pokemons, isDitto) {
+        
+        const showdownSimulator = function(currentTeamNumbers, pokemons, hasDitto) {
+            const pokemonPool = [...pokemons];
+            const pokemon = [];
+            const initialPokemon = [...currentTeamNumbers];
+        
+            const rejectedButNotInvalidPool = [];
+        
+            const typeCount = {};
+            const weaknessCount = {Electric: 0, Psychic: 0, Water: 0, Ice: 0, Ground: 0, Fire: 0};
+            let numMaxLevelPokemon = 0;
+            
+            while (pokemonPool.length && pokemon.length < consts.maxTeamSize) { // redo this to use isValid
+                let species;
+                if (initialPokemon.length > 0) {
+                    const speciesNumber = initialPokemon.shift();
+                    species = pokemons.find(p => p.number === speciesNumber);
+                }
+                else {
+                    const randomIndex = Math.floor(Math.random()*pokemonPool.length);
+                    species = pokemonPool[randomIndex];
+                    delete pokemonPool[randomIndex];
+                }
+                if (species == void 0) continue;
+        
+                if (species.id === 'ditto' && hasDitto) continue;
+        
+                const limitFactor = Math.round(consts.maxTeamSize / 6) || 1;
+        
+                let skip = false;
+        
+                for (const typeName of species.types) {
+                    if (typeCount[typeName] >= 2 * limitFactor) {
+                        skip = true;
+                        break;
+                    }
+                }
+        
+                if (skip) {
+                    rejectedButNotInvalidPool.push(species.number);
+                    continue;
+                }
+
+                if (species.level === 100 && numMaxLevelPokemon >= limitFactor) {
+                    rejectedButNotInvalidPool.push(species.number);
+                    continue;
+                }
+        
+                const pokemonWeaknesses = [];
+                for (const typeName in weaknessCount) {
+                    const increaseCount = isWeakTo(species.types, typeName);
+                    if (!increaseCount) continue;
+                    if (weaknessCount[typeName] >= 2 * limitFactor) {
+                        skip = true;
+                        break;
+                    }
+                    pokemonWeaknesses.push(typeName);
+                }
+        
+                if (skip) {
+                    rejectedButNotInvalidPool.push(species.number);
+                    continue;
+                }
+        
+                pokemon.push(species.number);
+        
+                for (const typeName of species.types) {
+                    if (typeCount[typeName]) {
+                        typeCount[typeName]++;
+                    } else {
+                        typeCount[typeName] = 1;
+                    }
+                }
+        
+                for (const weakness of pokemonWeaknesses) {
+                    weaknessCount[weakness]++;
+                }
+
+                if (species.level === 100) numMaxLevelPokemon++;
+        
+                if (species.id === 'ditto') hasDitto = true;
+            }
+        
+            while (pokemon.length < consts.maxTeamSize && rejectedButNotInvalidPool.length) {
+                const speciesNumber = rejectedButNotInvalidPool[rejectedRandomIndex];
+                if (speciesNumber == void 0) continue;
+                delete pokemonPool[randomIndex];
+                pokemon.push(speciesNumber);
+            }
+        
+            if (pokemon.length < consts.maxTeamSize && pokemon.length < 12) {
+                throw new Error("Could not build a random team.");
+            }
+        
+            for (let i = pokemon.length - 1; i >= 0; i--) {
+                if (currentTeamNumbers.includes(pokemon[i])) {
+                    pokemon.splice(i, 1);
+                }
+            }
+            return pokemon;
+        }
+
+        const odds = {};
+        let uniquePokemonNumbers = [];
+        for (let i = 0; i < simulationCount; i++) {
+            const team = showdownSimulator(currentTeamNumbers, pokemons, isDitto === true);
+            updateOdds(team, type, odds, uniquePokemonNumbers);
+        }
+        const finalOdds = finalizeOdds(odds, simulationCount, uniquePokemonNumbers.length);
+        return finalOdds;
     }
-    for (const type of validTypes) {
-      const capitalizedType = capitalizeFirstLetter(type);
-      let typeOdds = 1;
-      let sameTypeCount = 0;
-      if (pokemons.some(p => p.types.includes(capitalizedType))) {
-        const unrevealedMons = [];
-        for (const unrevealedPokemon in unrevealedPokemons) {
-            const unrevealedMon = pokemons.find(p => p.id === unrevealedPokemon);
-            if (unrevealedMon.types.includes(capitalizedType)) {
-                typeOdds = typeOdds * (1 - unrevealedPokemons[unrevealedPokemon]);
-                sameTypeCount++;
+
+    const updateOdds = function(team, type, odds, uniquePokemonNumbers) {
+        const teamTotal = {};
+        if (type === "pokemon") {
+            for (const pokemonNumber of team) {
+                const pokemonName = _pokemonNameByNumber[pokemonNumber];
+                teamTotal[pokemonName] = 1;
+                if (uniquePokemonNumbers != void 0 && !uniquePokemonNumbers.includes(pokemonNumber)) {
+                    uniquePokemonNumbers.push(pokemonNumber);
+                }
             }
         }
-        const probability = typeOdds * (sameTypeCount/pokemons.length);
-        typeProbabilities.push({ type: type, probability: probability });
-      }
+        else {
+            for (const pokemonNumber of team) {
+                if (uniquePokemonNumbers != void 0 && !uniquePokemonNumbers.includes(pokemonNumber)) {
+                    uniquePokemonNumbers.push(pokemonNumber);
+                }
+                const types = _pokemonTypesByNumber[pokemonNumber];
+                if (type === "dual types") {
+                    const dualType = types.sort().join("/");
+                    teamTotal[dualType] = 1;
+                }
+                else {
+                    for (const type of types) {
+                        teamTotal[type] = 1;
+                    }
+                }
+                const sleeperOdds = _sleepProbabilityByPokemon[pokemonNumber];
+                if (!!sleeperOdds) {
+                    teamTotal["Sleep"] = (1 - (1 - (teamTotal["Sleep"] || 0)) * (1-sleeperOdds));
+                }
+                const paralyzerOdds = _paralyzeProbabilityByPokemon[pokemonNumber];
+                if (!!paralyzerOdds) {
+                    teamTotal["Paralysis"] = (1 - (1 - (teamTotal["Paralysis"] || 0)) * (1-paralyzerOdds));
+                }
+            }
+        }
+        for (const field in teamTotal) {
+            odds[field] = (odds[field] || 0) + teamTotal[field];
+        }
+        return odds;
     }
-    typeProbabilities.sort((a, b) => b.probability - a.probability);
-    currentTypeProbabilities = [...typeProbabilities];
-    return typeProbabilities;
-}
+
+    const finalizeOdds = function(odds, teamCount, total) {
+        for (const field in odds) {
+            odds[field] = (odds[field] || 0) / teamCount;
+        }
+        odds["Total"] = total;
+        return odds;
+    }
+
+    const isValid = function(pokemon, currentTeamNumbers, isDitto) {
+        if (currentTeamNumbers.includes(pokemon.number)) return false;
+
+        if (isDitto && pokemon.number === _dittoNumber) return false;
+    
+        for (const type of pokemon.types) {
+            let typeTotal = 0;
+            for (const currentTeamNumber of currentTeamNumbers) {
+                if (_pokemonTypesByNumber[currentTeamNumber].includes(type)) {
+                    typeTotal++;
+                }
+            }
+            if (typeTotal >= 2) return false;
+        }
+        
+        if (_level100PokemonNumbers.includes(pokemon.number)) {
+            if (currentTeamNumbers.some(num => _level100PokemonNumbers.includes(num))) {
+                return false;
+            }
+        }
+    
+        const weaknesses = _spammableWeaknessesByPokemon[pokemon.id];
+        for (const weakness of weaknesses) {
+            const sharedWeakMonNumbers = _pokemonNumbersByTypeWeakness[weakness];
+            if (currentTeamNumbers.filter(n => sharedWeakMonNumbers.includes(n)).length >= 2) {
+                return false;
+            }
+        }
+        return true;
+    }
+})();
