@@ -1,8 +1,11 @@
 {
     "manifest_version": 3,  
     "name": "RooBY",
-    "version": "0.4",
+    "version": "1.0.0",
     "description": "Adds calculators and extra functionality to Generation 1 Pokemon Showdown",
+    "permissions": [
+      "storage"
+    ],
     "icons": {
       "16": "images/icon-16.png",
       "32": "images/icon-32.png",
@@ -15,12 +18,33 @@
     },
     "content_scripts": [
       {
-        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/constantMovesets.js", "scripts/calculator.js", "scripts/content.js"],
+        "world": "MAIN",
+        "js": ["scripts/page.js"],
+        "matches": [
+          "https://play.pokemonshowdown.com/*",
+          "https://replay.pokemonshowdown.com/*"
+        ],
+        "run_at": "document_start"    
+      },
+      {
+        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/calculator.js", "scripts/playContent.js"],
         "css": ["styles/style.css"],
         "matches": [
-          "https://play.pokemonshowdown.com/*"
+          "https://play.pokemonshowdown.com/*",
+          "https://replay.pokemonshowdown.com/*"
+        ],
+        "run_at": "document_end"    
+      },
+      {
+        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/calculator.js", "scripts/calcContent.js"],
+        "matches": [
+          "https://calc.pokemonshowdown.com/*"
         ],
         "run_at": "document_end"    
       }
-    ]
+    ],
+    "web_accessible_resources": [{
+      "matches": ["<all_urls>"],
+      "resources": ["images/icon-128.png", "images/digimonicons-sheet.png", "images/gen5icons-sheet.png", "images/gen5icons-pokeball-sheet.png"]
+    }]
   }
