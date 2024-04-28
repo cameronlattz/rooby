@@ -1,17 +1,80 @@
+.tooltip .damage, .tooltip .failure {
+    float: right;
+}
 .tooltip .section .calculator {
     font-style: italic;
-}.tooltip .section .calculator.zero {
-    opacity: 0.7;
 }
-.tooltip .section .damage {
-    float: right;
-    font-style: normal;
+.tooltip .zero {
+    opacity: 0.5;
+}
+.failure:not(.p0) {
+    color: #f00;
 }
 .message-log .chat.calculator {
     background-color: lightgray;
     border: 1px solid gray;
     padding: 2px;
 }
-small.damage {
+small.damage, small.failure {
     display: block;
+}
+#shinyPercentage {
+    width: unset;
+}
+#tooltipwrapper .tooltip .calculator .damage-container {
+    display: flex;
+    flex-wrap: wrap;
+}
+#tooltipwrapper .tooltip .calculator .damage-container > span {
+    flex-grow: 1;
+}
+#tooltipwrapper .tooltip .calculator .hko {
+    padding-top: 4px;
+}
+#tooltipwrapper .tooltip .calculator .recoil {
+    font-size: 0.8em;
+    align-self: flex-end;
+}
+body .movemenu button.recovery-failure {
+    color: #c00;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+body .movemenu button.recovery-failure small {
+    font-weight: normal;
+    text-transform: none;
+}
+.self-hit.damage {
+    font-size: 0.8em;
+    font-style: italic;
+}
+#backdropBottom {
+    position: absolute;
+    bottom: -1px;
+    width: 439px;
+    left: 100px;
+    background-color: rgba(255, 255, 255, .5);
+    border-top: 1px solid rgba(215,215,215,.5);
+    display: none;
+}
+#backdropBottom.no-border {
+    height: 64px;
+    display: block;
+}
+div#backdropBottom.old-gen {
+    height: 80px;
+}
+div#backdropBottom.big-gen.no-border {
+    display: none;
+}
+.rightbar, .leftbar {
+    z-index: 1;
+}
+.innerbattle > .message {
+    z-index: 2;
+}
+.rooby-chat-info {
+    border: 1px solid gray;
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 3px;
 }
