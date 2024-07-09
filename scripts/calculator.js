@@ -311,8 +311,14 @@ const roobyCalc = function() {
 
 	const damage = function(pokemon, opponent, moveName, moveBp, isCrit) {
 
-		const getCalculation = function(generation, pokemon, opposingPokemon, move, dexMove) {	
-			const calculation = calc.calculate(generation, pokemon, opposingPokemon, move);
+		const getCalculation = function(generation, pokemon, opposingPokemon, move, fieldEffects) {
+			const field = new calc.Field(generation);
+			if (fieldEffects != void 0) {
+				field.defenderSide.isReflect = fieldEffects.defenderSide.isReflect;
+				field.defenderSide.isLightScreen = fieldEffects.defenderSide.isLightScreen;
+			}
+			const calculation = calc.calculate(generation, pokemon, opposingPokemon, move, field);
+			const dexMove = Object.values(consts.moves).find(m => m.name === moveName);
 			if (dexMove.multihit != void 0) {
 				const newDamage = [];
 				const multihit = dexMove.multihit[0] != void 0 ? dexMove.multihit : [dexMove.multihit, dexMove.multihit];
@@ -328,7 +334,7 @@ const roobyCalc = function() {
 			return calculation;
 		}
 
-		const getTransformedStats = function(generation, pokemonId, pokemonLevel, transformedIntoId, transformedIntoLevel) {
+		const getTransformedStats = function(generation, pokemonId, pokemonLevel, transformedIntoId, transformedIntoLevel, boosts) {
 			const isTransformed = transformedIntoId != void 0 && pokemonId !== transformedIntoId;
 			const transformee = isTransformed ? new calc.Pokemon(generation, transformedIntoId, {level:transformedIntoLevel}) : {};
 			const calcPokemon = new calc.Pokemon(generation, pokemonId, {level:pokemonLevel});
@@ -339,7 +345,7 @@ const roobyCalc = function() {
 				ivs: isTransformed ? transformee.ivs : calcPokemon.ivs,
 				evs: isTransformed ? transformee.evs : calcPokemon.evs,
 				species: isTransformed ? transformee.species : calcPokemon.species,
-				boosts: isTransformed ? transformee.boosts : calcPokemon.boosts,
+				boosts: boosts || isTransformed ? transformee.boosts : calcPokemon.boosts
 			}
 			pokemonStats.rawStats.hp = calcPokemon.rawStats.hp;
 			pokemonStats.stats.hp = calcPokemon.stats.hp;
@@ -371,37 +377,48 @@ const roobyCalc = function() {
 		const generation = calc.Generations.get(1);
 		const move = new calc.Move(generation, moveName, {bp: moveBp, isCrit: isCrit});
 		const moveKey = Object.keys(consts.moves).filter(m => consts.moves[m].name === moveName)[0];
-		const dexMove = consts.moves[moveKey];
 		if (move.category === "Status" && !consts.recoveryMoves.includes(moveKey)) return {};
-		const pokemonStats = getTransformedStats(generation, pokemon.id, pokemon.level, pokemon.transformedId, pokemon.transformedLevel);
-		const pokemonHealthRemaining = pokemon.exactHealth || Math.round(pokemonStats.stats.hp * pokemon.healthRemainingPercent/100);
+		const pokemonStats = getTransformedStats(generation, pokemon.id, pokemon.level, pokemon.transformedId, pokemon.transformedLevel, pokemon.boosts);
 		if (consts.recoveryMoves.includes(moveKey)) {
-			if (pokemonHealthRemaining === pokemonStats.stats.hp) return { failureRate: 1 };
-			let range = Math.ceil(pokemonStats.stats.hp/100);
-			const mod = (pokemonStats.stats.hp - pokemonHealthRemaining) % 256;
-			if (pokemon.exactHealth && mod === 255 && pokemonHealthRemaining % 256 !== 0) {
-				return { failureRate: 1 };
+			if (pokemon.exactHealth) {
+				if (pokemon.exactHealth === pokemonStats.stats.hp) return { failureRate: 1 };
+				else if ((pokemonStats.stats.hp - pokemon.exactHealth) % 256 === 255) return { failureRate: 1 };
 			}
-			else if (mod >= (255 - (range/2)) || mod < (range/2)) {
-				return { failureRate: 1/range };
+			else {
+				const actualMin = Math.floor((pokemon.healthRemainingPercent - 1) / 100 * pokemonStats.stats.hp);
+				const actualMax = Math.ceil(pokemon.healthRemainingPercent / 100 * pokemonStats.stats.hp);
+				for (let healthValue = actualMin; healthValue <= actualMax; healthValue++) {
+					if ((pokemonStats.stats.hp - healthValue) % 256 === 255) {
+						return { failureRate: 1/(1 + actualMax - actualMin) };
+					}
+				}
+				return { failureRate: 0 };
 			}
-			else return { failureRate: 0 };
 		}
 		if (opponent == void 0) return {};
 		const untransformedPokemon = new calc.Pokemon(generation, pokemon.id, pokemonStats);
 		const critRate = getCritRate(untransformedPokemon.species.baseStats.spe, move.name);
 		const safePokemonId = (!move.isCrit && !!pokemon.transformedId) ? pokemon.transformedId : pokemon.id;
 		const calcPokemon = new calc.Pokemon(generation, safePokemonId, pokemonStats);
+		for (const stat in pokemon.boosts) {
+			calcPokemon.boosts[stat] = pokemon.boosts[stat];
+		}
+		if (pokemon.status.toLowerCase().length !== 0) calcPokemon.status = pokemon.status;
 		const opposingId = (!move.isCrit && !!opponent.transformedId) ? opponent.transformedId : opponent.id;
 		const opposingPokemonStats = getTransformedStats(generation, opponent.id, opponent.level, opponent.transformedId, opponent.transformedLevel);
 		const opposingCalcPokemon = new calc.Pokemon(generation, opposingId, opposingPokemonStats);
+		for (const stat in opponent.boosts) {
+			opposingCalcPokemon.boosts[stat] = opponent.boosts[stat];
+		}
+		if (opponent.status.toLowerCase().length !== 0) opposingCalcPokemon.status = opponent.status;
 		move.isCrit = isCrit != void 0 ? isCrit : critRate >= 1;
-		const calculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, dexMove);
+		const fieldEffects = { defenderSide: { isReflect: opponent.hasReflect, isLightScreen: opponent.hasLightScreen } };
+		const calculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, fieldEffects);
 		const isHighCritRate = isCrit != void 0 ? isCrit : critRate > .2735
 		let critCalculation;
 		if (isHighCritRate) {
 			move.isCrit = true;
-			critCalculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, dexMove);
+			critCalculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, fieldEffects);
 			if (!Array.isArray(critCalculation.damage)) critCalculation.damage = [critCalculation.damage];
 		}
 		const opposingHealthRange = getHealthRange(opponent.healthRemainingPercent, calculation.defender.stats.hp);
@@ -413,6 +430,7 @@ const roobyCalc = function() {
 			min: calculation.damage[0],
 			max: (isHighCritRate ? critCalculation : calculation).damage[calculation.damage.length - 1]
 		};
+		if (dmgs.min > dmgs.max) [dmgs.min, dmgs.max] = [dmgs.max, dmgs.min];
 		const damage = {
 			range: isHighCritRate ? calculation.damage.concat(critCalculation.damage).sort((a, b) => a - b) : calculation.damage,
 		}

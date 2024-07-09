@@ -19,7 +19,8 @@
         if (pokemon == void 0) return;
         const hasExactStats = room.battle.myPokemon != void 0;
         const myPokemon = hasExactStats ? room.battle.myPokemon.find(p => p.name === args.name) : null;
-        args.healthRemainingPercent = hasExactStats ? myPokemon.hp / myPokemon.maxhp * 100 : pokemon.hp;
+        const healthRemainingPercent = hasExactStats ? myPokemon.hp / myPokemon.maxhp * 100 : pokemon.hp;
+        if (args.healthRemainingPercent != Math.ceil(healthRemainingPercent)) return;
         args.exactHealth = hasExactStats ? myPokemon.hp : null;
         return args;
     }

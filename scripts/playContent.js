@@ -105,8 +105,14 @@
             }
             else if (event.target.parentElement.classList.contains("chatbox") && event.target.tagName === "TEXTAREA") {
                 const value = event.target.getAttribute("data-value");
-                if (value.startsWith("/odds ")) {
+                if (value.startsWith("/odds")) {
                     simulateOdds(event.target, value);
+                }
+                else if (value.startsWith("/movesets")) {
+                    showMovesets(event.target, value);
+                }
+                else if (value.startsWith("/moves")) {
+                    showMoves(event.target, value);
                 }
                 else if (value.startsWith("/export")) {
                     const tabElement = playUtil.getParentRoomElement(event.target);
@@ -210,9 +216,17 @@
                     setTimeout(function(elem) {updateBackdrop(elem);}, 0, element);
                 }
                 else if (element.classList.contains("message-error")) {
-                    if (element.innerText.startsWith("The command \"/odds") || element.innerText.startsWith("The command \"/export")) {
-                        const isOdds = element.innerText.startsWith("The command \"/odds");
-                        playUtil.removeChatError(element, isOdds ? "odds" : "export");
+                    const isOdds = element.innerText.startsWith("The command \"/odds");
+                    const isMoveSets = element.innerText.startsWith("The command \"/movesets");
+                    const isMoves = element.innerText.startsWith("The command \"/moves");
+                    const isExport = element.innerText.startsWith("The command \"/export");
+                    let command;
+                    if (isOdds) command = "odds";
+                    else if (isMoveSets) command = "movesets";
+                    else if (isMoves) command = "moves";
+                    else if (isExport) command = "export";
+                    if (isOdds || isMoveSets || isMoves || isExport) {
+                        playUtil.removeChatError(element, command);
                     }
                 }
                 else {
@@ -344,7 +358,81 @@
         });
     }
 
+    const getPokemonHealth =  function(healthElement, statElement) {
+        if (!healthElement) {
+            const healthRemainingPercent = Number.parseInt(statElement.querySelector(".hptext").childNodes[0].nodeValue.trim().replace("%", ""));
+            return { healthRemainingPercent };
+        }
+        else {
+            const healthText = healthElement.nodeValue;
+            const paranthesisIndex = healthText.indexOf("(");
+            if (paranthesisIndex !== -1) {
+                const fullStats = healthText.substring(paranthesisIndex + 1, healthText.lastIndexOf(")"));
+                const healthNumber = Number.parseInt(fullStats.substring(0, fullStats.indexOf("/")));
+                const totalNumber = Number.parseInt(fullStats.substring(fullStats.indexOf("/") + 1));
+                return {
+                    exactHealth: healthNumber,
+                    healthRemainingPercent: healthNumber/totalNumber*100
+                }
+            }
+            else {
+                const healthRemainingPercent = Number.parseInt(healthText.trim().replace("%", ""));
+                return { healthRemainingPercent };
+            }
+        }
+    }
+
     const showTooltip = function(element, isRight) {
+
+        const getStatus = function(statElement, trainerElement, tooltip) {
+            let status = "";
+            let hasReflect = false;
+            let hasLightScreen = false;
+            const boosts = {};
+            if (statElement != void 0 && statElement.querySelector(".status") != void 0) {
+                const statStatusElement = statElement.querySelector(".status");
+                const statusElements = statStatusElement.children.length === 0
+                    ? [statStatusElement]
+                    : [...statStatusElement.children];
+                if (tooltip != void 0 && tooltip.querySelector(".status") != void 0) {
+                    status = tooltip.querySelector(".status").innerText;
+                }
+                else {
+                    if (statStatusElement.children.length === 0) {
+                        status = statStatusElement.innerText;
+                    }
+                    else {
+                        const statusChild = Array.from(statStatusElement.children).find(e => e.className !== "bad" && e.className !== "good");
+                        if (statusChild != void 0) status = statusChild.innerText;
+                    }
+                }
+                let isActive =  true;
+                if (tooltip != void 0) {
+                    const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip);
+                    const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
+                    isActive = playUtil.getActivePokemonId(trainerElement) === pokemonId;
+                }
+                if (isActive) {
+                    for (const element of statusElements) {
+                        if (element.innerText === "Reflect") hasReflect = true;
+                        else if (element.innerText === "Light Screen") hasLightScreen = true;
+                        else {
+                            const index = element.innerText.indexOf("\u00D7");
+                            if (index !== -1) {
+                                const parsedValue = Number.parseFloat(element.innerText.substring(0, index));
+                                const boostValue = parsedValue < 1
+                                    ? 2 - Math.round(2 / parsedValue)
+                                    : (parsedValue * 2) - 2;
+                                const boostName = element.innerText.substring(index + 1).trim().toLowerCase();
+                                boosts[boostName] = boostValue;
+                            }
+                        }
+                    }
+                }
+            }
+            return {status: status, hasReflect: hasReflect, hasLightScreen: hasLightScreen, boosts: boosts};
+            
+        }
 
         const buildTooltipPokemon = function(tooltip, roomElement, isRight, pokemonId) {
             const pokemons = [..._pokemons];
@@ -352,36 +440,23 @@
                 const statElement = playUtil.getStatElementBySide(roomElement, isRight);
                 const opponentStatElement = playUtil.getStatElementBySide(roomElement, !isRight);
                 const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
-                    
-                let exactHealth = null, healthRemainingPercent = null;
-                const healthElement = tooltip.querySelectorAll("p")[0].childNodes[1];
-                if (!healthElement) {
-                    healthRemainingPercent = Number.parseInt(statElement.querySelector(".hptext").childNodes[0].nodeValue.trim().replace("%", ""));
-                }
-                else {
-                    const healthText = healthElement.nodeValue;
-                    const paranthesisIndex = healthText.indexOf("(");
-                    if (paranthesisIndex !== -1) {
-                        const fullStats = healthText.substring(paranthesisIndex + 1, healthText.lastIndexOf(")"));
-                        const healthNumber = Number.parseInt(fullStats.substring(0, fullStats.indexOf("/")));
-                        const totalNumber = Number.parseInt(fullStats.substring(fullStats.indexOf("/") + 1));
-                        healthRemainingPercent = healthNumber/totalNumber*100;
-                        exactHealth = healthNumber;
-                    }
-                    else {
-                        healthRemainingPercent = Number.parseInt(tooltip.querySelectorAll("p")[0].childNodes[1].nodeValue.trim().replace("%", ""));
-                    }
-                }
+                 
+                let {exactHealth, healthRemainingPercent} = getPokemonHealth(tooltip.querySelectorAll("p")[0].childNodes[1], statElement);
                 const tab = playUtil.getTabIdByRoomElement(roomElement);
                 const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                 const trainerName = playUtil.getTrainerNameByElement(trainerElement);
                 const isActive = playUtil.getActivePokemonId(trainerElement) === pokemonId;
                 const pokemonLevel = playUtil.getLevelFromStatElement(!isActive ? tooltip.querySelector("h2") : statElement);
+                const status = getStatus(statElement, trainerElement, tooltip);
                 const pokemon = {
                     exactHealth: exactHealth,
                     healthRemainingPercent: healthRemainingPercent,
                     id: pokemonId,
                     level: pokemonLevel,
+                    boosts: status.boosts,
+                    status: status.status,
+                    hasReflect: status.hasReflect,
+                    hasLightScreen: status.hasLightScreen
                 }
                 if (pokemon.level == void 0) return;
                 const transformedId = playUtil.getTransformedId(trainerElement, statElement);
@@ -392,11 +467,16 @@
                     if (pokemon.transformedLevel == void 0) return;
                 }
                 const opponentPokemonId = playUtil.getActivePokemonId(opponentTrainerElement);
+                const opponentStatus = getStatus(opponentStatElement, opponentTrainerElement);
                 if (opponentPokemonId != void 0) {
                     const opponent = {
                         healthRemainingPercent: Number.parseInt(opponentStatElement.querySelector(".hptext").childNodes[0].nodeValue.trim().replace("%", "")),
                         id: opponentPokemonId,
                         level: playUtil.getLevelFromStatElement(opponentStatElement),
+                        boosts: opponentStatus.boosts,
+                        status: opponentStatus.status,
+                        hasReflect: opponentStatus.hasReflect,
+                        hasLightScreen: opponentStatus.hasLightScreen
                     }
                     if (opponent.level == void 0) return;
                     const opponentTransformedId = playUtil.getTransformedId(opponentTrainerElement, opponentStatElement)
@@ -420,17 +500,10 @@
                 const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                 const activePokemonId = playUtil.getActivePokemonId(trainerElement);
                 const tooltipPokemon = buildTooltipPokemon(tooltip, roomElement, isRight, activePokemonId);
-                showMoveTooltip(section, tooltip, roomElement, false, tooltipPokemon);
+                showMoveTooltip(section, tooltip, roomElement, tooltipPokemon);
             }
             else {
-                const h2 = tooltip.querySelector("h2");
-                const possibleNickedNameElementHtmls = Array.from(h2.querySelectorAll("small"))
-                    .filter(s => s.innerHTML.startsWith("(") && s.innerHTML.endsWith(")"))
-                    .map(e => e.innerHTML.substring(1, e.innerHTML.length - 1));
-                const nickedPokemon = possibleNickedNameElementHtmls.map(h => _pokemons.find(p => p.name === h)).find(p => p != void 0);
-                const tooltipPokemonName = nickedPokemon != void 0
-                    ? nickedPokemon.name
-                    : h2.childNodes[0].nodeValue.trim();
+                const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip);
                 const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
                 const tooltipPokemon = buildTooltipPokemon(tooltip, roomElement, isRight, pokemonId);
                 if (!!tooltipPokemon) showPokemonTooltip(section, tooltip, roomElement, isRight, tooltipPokemon);
@@ -449,7 +522,7 @@
         }
     }
 
-    const showMoveTooltip = function(section, tooltip, roomElement, isRight, pokemon) {
+    const showMoveTooltip = function(section, tooltip, roomElement, pokemon) {
         if (pokemon.id == void 0) return;
         if (tooltip.querySelector(".tooltip-section").querySelector(".calculator") != void 0) return;
         section = document.createElement("p");
@@ -611,9 +684,9 @@
     const simulateOdds = function(target, value) {
         const args = value.split(" ");
         const simulationTypes = ["pokemon", "types", "dual types"];
-        if (args[1] === "dual" && args[2] === "types") args[1] = "dual types";
+        if (args.length > 2 && args[1] === "dual" && args[2] === "types") args[1] = "dual types";
         const example = "<b>Example:</b> /odds dual types [butterfree, golduck, vulpix] ditto:true";
-        if (args[1] === "help") {
+        if (args.length === 1 || args[1] === "help") {
             playUtil.chatOutput(target, "Use the command /odds followed by the simulation type, the team between brackets and optionally <i>\"ditto:true.\"</i> and <i>\"simulations:200000.\"</i><br>" + example);
         }
         else if (!simulationTypes.includes(args[1])) {
@@ -670,6 +743,53 @@
                 playUtil.chatOutput(target, output, "rooby-chat-info");
                 void chrome.runtime.lastError;
             });
+        }
+    }
+
+    const showMovesets = function(target, value) {
+        const args = value.split(" ");
+        if (args.length === 1 || args[1] === "help") {
+            const example = "<b>Example:</b> /movesets Parasect";
+            playUtil.chatOutput(target, "Use the command /movesets followed by the name of the Pokémon.<br>" + example);
+        }
+        else {
+            const name = util.getMostSimilarString(args[1], _pokemons.map(p => p.name));
+            const pokemon = _pokemons.find(p => p.name === name);
+            const moveSetDisplay = function(moveset) {
+                const moveNames = moveset.moves.map(m => consts.moves[m].name);
+                const output = moveNames.join(", ") + ": " + (moveset.percent*100).toFixed(2) + "%";
+                return output;
+            }
+            const  moveSetsOutput = pokemon.moveSets
+                .sort((a, b) => a.moves.toString().localeCompare(b.moves.toString()))
+                .sort((a, b) => b.percent - a.percent)
+                .map(m => moveSetDisplay(m))
+                .join("<br>");
+            const output = "<b>Movesets for " + pokemon.name + ":</b><hr>" + moveSetsOutput;
+            playUtil.chatOutput(target, output, "rooby-chat-info");
+        }
+    }
+
+    const showMoves = function(target, value) {
+        const args = value.split(" ");
+        if (args.length === 1 || args[1] === "help") {
+            const example = "<b>Example:</b> /moves Slowbro";
+            playUtil.chatOutput(target, "Use the command /movesets followed by the name of the Pokémon.<br>" + example);
+        }
+        else {
+            const name = util.getMostSimilarString(args[1], _pokemons.map(p => p.name));
+            const pokemon = _pokemons.find(p => p.name === name);
+            const moveSetDisplay = function(move) {
+                const output = move.name + ": " + (move.probability*100).toFixed(2) + "%";
+                return output;
+            }
+            const movesOutput = pokemon.moves
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .sort((a, b) => b.probability - a.probability)
+                .map(m => moveSetDisplay(m))
+                .join("<br>");
+            const output = "<b>Moves for " + pokemon.name + ":</b><hr>" + movesOutput;
+            playUtil.chatOutput(target, output, "rooby-chat-info");
         }
     }
 
@@ -841,15 +961,27 @@
             let backSprite = _settings.sprites["back"] == 1 ? _randomSprites[tab]["back"] : _settings.sprites["back"];
             if (backSprite == 0) backSprite = "gen1-back";
             backdropBottom.classList = [];
+            let isMidGenBackAndOldGenSprite = false;
+            let isOldGenBackAndMidGenSprite = false;
             if (backSprite.startsWith("gen1") || backSprite.startsWith("gen2")) {
                 backdropBottom.classList.add("old-gen");
+                if (backdrop.indexOf("-gen3") !== -1 || backdrop.indexOf("-gen4") !== -1) {
+                    isMidGenBackAndOldGenSprite =  true;
+                }
+            }
+            else if (backSprite.startsWith("gen3") || backSprite.startsWith("gen4")) {
+                if (backdrop.indexOf("-gen1") !== -1 || backdrop.indexOf("-gen2") !== -1) {
+                    isOldGenBackAndMidGenSprite =  true;
+                }
             }
             else if (backSprite.startsWith("digimon") || backSprite.includes("ani") || backSprite.includes("gen5") || backSprite.includes("afd")) {
                 backdropBottom.classList.add("big-gen");
             }
-            if (backdrop.indexOf("-gen") === -1) {
-                backdropBottom.classList.add("no-border");
-            }
+            if (backdrop.indexOf("-gen") === -1) backdropBottom.classList.add("no-border");
+            if (isMidGenBackAndOldGenSprite) roomElement.querySelector(".backdrop").classList.add("old-gen");
+            else roomElement.querySelector(".backdrop").classList.remove("old-gen");
+            if (isOldGenBackAndMidGenSprite) roomElement.querySelector(".backdrop").classList.add("mid-gen");
+            else roomElement.querySelector(".backdrop").classList.remove("mid-gen");
             const trainers = roomElement.querySelectorAll(".trainer");
             for (const trainer of trainers) {
                 updateIcons(trainer);
@@ -1117,12 +1249,12 @@
         }
     
         const removeChatError = function(inputElement, command) {
-            setTimeout(function() {
+            setTimeout(function(command) {
                 const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
                 const errorElement = Array.from(chatBox.querySelectorAll(".message-error"))
                     .findLast(c => c.innerHTML.startsWith("The command \"/" + command + "\" does not exist."));
                 if (errorElement != void 0) errorElement.remove();
-            }, 0);
+            }, 0, command);
         }
     
         const recoveryFailureCheck = function(tab, trainerName, pokemonId) {
@@ -1136,10 +1268,14 @@
             if (pokemonId == void 0) return;
             const pokemonName = getPokemonNameById(pokemonId);
             if (pokemonName == void 0) return;
+            const roomElement = playUtil.getRoomElementByTabId(tab);
+            const statElement = playUtil.getStatElementBySide(roomElement, false);
+            const { healthRemainingPercent } = getPokemonHealth(null, statElement);
             window.postMessage({
                 function:"getExactHealthByName",
                 args: {
                     name: pokemonName,
+                    healthRemainingPercent: healthRemainingPercent,
                     isRight: false,
                     tab: tab,
                     trainerName: trainerName
@@ -1177,6 +1313,18 @@
 
         const getParentRoomElement = function(element) {
             return element.closest(_page === "play" ? ".ps-room-opaque" : ".battle");
+        }
+
+        const getPokemonNameFromTooltip = function(tooltip) {
+            const h2 = tooltip.querySelector("h2");
+            const possibleNickedNameElementHtmls = Array.from(h2.querySelectorAll("small"))
+                .filter(s => s.innerHTML.startsWith("(") && s.innerHTML.endsWith(")"))
+                .map(e => e.innerHTML.substring(1, e.innerHTML.length - 1));
+            const nickedPokemon = possibleNickedNameElementHtmls.map(h => _pokemons.find(p => p.name === h)).find(p => p != void 0);
+            const tooltipPokemonName = nickedPokemon != void 0
+                ? nickedPokemon.name
+                : h2.childNodes[0].nodeValue.trim();
+            return tooltipPokemonName;
         }
     
         const getPokemonIdByName = function(pokemonName) {
@@ -1268,6 +1416,7 @@
             getParentRoomElement,
             getPokemonIdByName,
             getPokemonLevelById,
+            getPokemonNameFromTooltip,
             getRevealedPokemonIds,
             getRoomElementByTabId,
             getTabIdByRoomElement,

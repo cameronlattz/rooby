@@ -225,7 +225,7 @@ const consts = function() {
 	const maxTeamSize = 6;
 
 	const randomsDataUrl = {
-		"gen1": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/gen1/random-data.json"
+		"gen1": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/random-battles/gen1/data.json"
 	};
 	
 	const formatsDataUrl = {

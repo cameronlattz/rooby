@@ -64,6 +64,14 @@ body .movemenu button.recovery-failure small {
 div#backdropBottom.old-gen {
     height: 80px;
 }
+.backdrop.old-gen {
+    margin-top: -40px;
+    transform: scaleY(1.2);
+}
+.backdrop.mid-gen {
+    margin-top: 9px;
+    transform: scaleY(1.06);
+}
 div#backdropBottom.big-gen.no-border {
     display: none;
 }

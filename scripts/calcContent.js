@@ -123,26 +123,55 @@
         const opponentSelector = "#p" + (isRight ? "1" : "2");
         const name = document.querySelector(selector + " .select2-chosen").innerHTML;
         const pokemonLevel = Number.parseInt(document.querySelector(selector + " input.level").value);
-        const exactHealth = Number.parseInt(document.querySelector(selector + " input.current-hp").value);
-        const healthRemainingPercent = Number.parseInt(document.querySelector(selector + " input.percent-hp").value);
-        const opponentPokemonLevel = Number.parseInt(document.querySelector(opponentSelector + " input.level").value);
-        const opponentPokemonRemainingHealth = Number.parseInt(document.querySelector(opponentSelector + " input.percent-hp").value);
         const pokemon = getPokemonByName(name, pokemonLevel);
         const opponentName = document.querySelector(opponentSelector + " .select2-chosen").innerHTML;
+        const opponentPokemonLevel = Number.parseInt(document.querySelector(opponentSelector + " input.level").value);
         const opponentPokemon = getPokemonByName(opponentName, opponentPokemonLevel);
-        const moveName = moveDiv.querySelector("select.move-selector").value;
-        const moveBp = Number.parseInt(moveDiv.querySelector("input.move-bp").value);
+
         const transformInputs = document.querySelectorAll("#transformInfo input.calc-trigger");
         const transformInput = transformInputs[!isRight ? 0 : 1];
         const opposingTransformInput = transformInputs[isRight ? 0 : 1];
-        pokemon.exactHealth = exactHealth;
-        pokemon.healthRemainingPercent = healthRemainingPercent;
+
+        pokemon.exactHealth = Number.parseInt(document.querySelector(selector + " input.current-hp").value);
+        pokemon.healthRemainingPercent = Number.parseInt(document.querySelector(selector + " input.percent-hp").value);
         pokemon.transformedId = transformInput.transformedId;
         pokemon.transformedLevel = transformInput.transformedLevel;
-        opponentPokemon.healthRemainingPercent = opponentPokemonRemainingHealth;
+        opponentPokemon.exactHealth = Number.parseInt(document.querySelector(opponentSelector + " input.current-hp").value);
+        opponentPokemon.healthRemainingPercent = Number.parseInt(document.querySelector(opponentSelector + " input.percent-hp").value);
         opponentPokemon.transformedId = opposingTransformInput.transformedId;
         opponentPokemon.transformedLevel = opposingTransformInput.transformedLevel;
-        const result = roobyCalc.damage(pokemon, opponentPokemon, moveName, moveBp, isCrit);
+
+        const infoDiv = Array.from(document.querySelector(selector).querySelectorAll(".info-group")).find(e => !e.classList.contains("top"));
+        const boosts = {
+            atk: Number.parseInt(infoDiv.querySelector(".at").querySelector(".boost").value),
+            def: Number.parseInt(infoDiv.querySelector(".df").querySelector(".boost").value),
+            spa: Number.parseInt(infoDiv.querySelector(".sl").querySelector(".boost").value),
+            spd: Number.parseInt(infoDiv.querySelector(".sl").querySelector(".boost").value),
+            spe: Number.parseInt(infoDiv.querySelector(".sp").querySelector(".boost").value)
+        }
+        const opponentInfoDv = Array.from(document.querySelector(opponentSelector).querySelectorAll(".info-group")).find(e => !e.classList.contains("top"));
+        const opponentBoosts = {
+            atk: Number.parseInt(opponentInfoDv.querySelector(".at").querySelector(".boost").value),
+            def: Number.parseInt(opponentInfoDv.querySelector(".df").querySelector(".boost").value),
+            spa: Number.parseInt(opponentInfoDv.querySelector(".sl").querySelector(".boost").value),
+            spd: Number.parseInt(opponentInfoDv.querySelector(".sl").querySelector(".boost").value),
+            spe: Number.parseInt(opponentInfoDv.querySelector(".sp").querySelector(".boost").value)
+        }
+
+        const fieldEffects = {
+            attackerSide: {
+                isReflect: document.querySelector("#reflect" + (isRight ? "R" : "L")).checked,
+                isLightScreen: document.querySelector("#lightScreen" + (isRight ? "R" : "L")).checked
+            },
+            defenderSide: {
+                isReflect: document.querySelector("#reflect" + (isRight ? "L" : "R")).checked,
+                isLightScreen: document.querySelector("#lightScreen" + (isRight ? "L" : "R")).checked
+            }
+        }
+
+        const moveName = moveDiv.querySelector("select.move-selector").value;
+        const moveBp = Number.parseInt(moveDiv.querySelector("input.move-bp").value);
+        const result = roobyCalc.damage(pokemon, opponentPokemon, moveName, moveBp, isCrit, boosts, opponentBoosts, fieldEffects);
         return result;
     };
 
