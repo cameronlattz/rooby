@@ -86,3 +86,6 @@ div#backdropBottom.big-gen.no-border {
     background-color: rgba(0, 0, 0, 0.1);
     padding: 3px;
 }
+.tooltip .section {
+    background-color: transparent;
+}

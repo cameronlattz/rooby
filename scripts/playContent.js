@@ -17,9 +17,9 @@
     (function() {
         _doc.addEventListener("mouseover", (event) => {
             const element = event.target;
-            const roomElement = _page === "play" ? event.target.closest(_playRoomSelector) : document.querySelector(".battle");
+            const roomElement = _page === "play" ? event.target.closest(_playRoomSelector) : document.querySelector(".battle").parentElement;
             if (roomElement == void 0) return;
-            const isRandomBattle = roomElement.id.indexOf("randombattle") !== -1;
+            if (roomElement.id === "" && _page === "replay") roomElement.id = "room-battle-" + window.location.pathname.substring(1);
             const pokemons = [..._pokemons];
             if (element.getAttribute("title") === "Not revealed" && !! pokemons && _settings.unrevealedCalculator !== false){
                 
@@ -194,12 +194,20 @@
             settingsPopup(element);
         }
         else {
-            const currentTab = document.querySelector(".roomtab.cur");
-            if (currentTab == void 0) return;
-            const tabElement = currentTab.querySelector(".text");
-            if (tabElement == void 0) return;
-            const gametype = tabElement.innerText;
-            const roomElement = playUtil.getParentRoomElement(element);
+            let roomElement;
+            let gametype;
+            if (_page === "play") {
+                const currentTab = document.querySelector(".roomtab.cur");
+                if (currentTab == void 0) return;
+                const tabElement = currentTab.querySelector(".text");
+                if (tabElement == void 0) return;
+                gametype = tabElement.innerText;
+                roomElement = playUtil.getParentRoomElement(element);
+            }
+            else if (_page === "replay") {
+                gametype = document.title.split(":")[0];
+                roomElement = playUtil.getParentRoomElement(element);
+            }
             if (roomElement == void 0) return;
             if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement != void 0) {
                 if (element.classList.contains("trainer")) {
@@ -987,7 +995,7 @@
                 updateIcons(trainer);
             }
         }
-        if (element != null && element.style.backgroundImage != void 0 && _page === "play") {
+        if (element != null && element.style.backgroundImage != void 0) {
             let backdrop = _settings.backdrop;
             const roomElement = playUtil.getParentRoomElement(element);
             if (roomElement == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
@@ -1040,7 +1048,7 @@
 
     const updateSprite = function(element) {
         const src = element.getAttribute("src");
-        if (_settings.useModernSprites === true || _page !== "play" || src.indexOf("/types/") !== -1) return;
+        if (_settings.useModernSprites === true || (_page !== "play" && _page != "replay") || src.indexOf("/types/") !== -1) return;
         const urlStart = _playUrl + "/sprites/";
         if (src.startsWith(urlStart) && _settings.sprites["front"] != void 0) {
             let key = "front";
@@ -1312,7 +1320,9 @@
         }
 
         const getParentRoomElement = function(element) {
-            return element.closest(_page === "play" ? ".ps-room-opaque" : ".battle");
+            return _page === "play"
+                ? element.closest(".ps-room-opaque")
+                : document.querySelector(".battle").parentElement;
         }
 
         const getPokemonNameFromTooltip = function(tooltip) {
