@@ -14,7 +14,7 @@
         return eval(functionName)(rooms, args);
     }
 
-    const getExactHealthByName = function(room, args) {
+    this.getExactHealthByName = function(room, args) {
         const pokemon = getPokemonFromData(room, args.isRight, args.name);
         if (pokemon == void 0) return;
         const hasExactStats = room.battle.myPokemon != void 0;
@@ -25,7 +25,7 @@
         return args;
     }
 
-    const getPokemonLevels = function(room, args) {
+    this.getPokemonLevels = function(room, args) {
         args.pokemons = [];
         for (const isRight of [false, true]) {
             const pokemons = getPokemonFromData(room, isRight);
@@ -36,7 +36,7 @@
         return args;
     }
 
-    const getPokemonStatsByName = function(room, args) {
+    this.getPokemonStatsByName = function(room, args) {
         const pokemon = getPokemonFromData(room, args.isRight, args.name);
         if (pokemon == void 0) return;
         args.level = pokemon.level;
@@ -53,7 +53,7 @@
         return args;
     }
 
-    const exportTeams = function(room, args, pokemons) {
+    this.exportTeams = function(room, args) {
         args.teams = [];
         for (const isRight of [false, true]) {
             const pokemons = getPokemonFromData(room, isRight);

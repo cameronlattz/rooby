@@ -8,11 +8,12 @@ const consts = function() {
 			"back-shiny": "2"
 		},
 		backdrop: "0",
-		shinyPercentage: 2,
+		shinyPercentage: 0,
 		damageCalculator: true,
 		movesetCalculator: true,
 		unrevealedCalculator: true,
 		miscCalculator: true,
+		trainerTooltip: true,
 		useModernSprites: false
 	};
 
@@ -231,6 +232,10 @@ const consts = function() {
 	const formatsDataUrl = {
 		"gen1": "https://raw.githubusercontent.com/smogon/pokemon-showdown/master/data/mods/gen1/formats-data.ts"
 	};
+
+	const laddersUrl = "https://pokemonshowdown.com/ladder/";
+
+	const ratingsDataUrl = "https://pokemonshowdown.com/users/";
 	
 	const gameUrls = ["https://play.pokemonshowdown.com", "https://replay.pokemonshowdown.com"];
 
@@ -3858,7 +3863,7 @@ const consts = function() {
 		statusMoves,
 		transformedIntoString,
 		typechart,
-		urls: { randomsDataUrl, formatsDataUrl, gameUrls }
+		urls: { formatsDataUrl, gameUrls, laddersUrl, ratingsDataUrl, randomsDataUrl }
 	}
 }();
 

@@ -1,4 +1,4 @@
-const roobyCalc = function() {
+window.roobyCalc = function() {
 	"use strict";
 	const calculateDistribution = function(pokemon) {
 	// originally created by popotheslope
@@ -102,9 +102,9 @@ const roobyCalc = function() {
 		let real_essentialMoves, real_exclusiveMoves, real_randomBattleMoves;
 		const root = new Tree(1, []);
 		updateLeaves(root);
-		root.children.push(new Tree(!!pokemon["comboMoves"] ? 0.5 : 1, []));
+		root.children.push(new Tree(pokemon["comboMoves"] ? 0.5 : 1, []));
 	
-		if (!!pokemon["comboMoves"]) {
+		if (pokemon["comboMoves"]) {
 		  	for (const leaf of leaves) {
 				const tree = new Tree(0.5 * leaf.percent, pokemon["comboMoves"].map(cm => cm.move));
 				root.children.push(tree);
@@ -114,7 +114,7 @@ const roobyCalc = function() {
 		leaves = [];
 		updateLeaves(root);
 	
-		if (!!pokemon["exclusiveMoves"]) {
+		if (pokemon["exclusiveMoves"]) {
 		  	for (const leaf of leaves) {
 				if (leaf.set.length < 4) {
 			  	real_exclusiveMoves = function () {
@@ -175,7 +175,7 @@ const roobyCalc = function() {
 		leaves = [];
 		updateLeaves(root);
 	
-		if (!!pokemon["randomBattleMoves"]) {
+		if (pokemon["randomBattleMoves"]) {
 		  let exhausted = false;
 		  while (!exhausted) {
 			exhausted = true;

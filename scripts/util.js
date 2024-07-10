@@ -1,4 +1,4 @@
-const util = function() {
+window.util = function() {
 	const BattleTooltips = function() {
 		function BattleTooltips(battle) {
 			const _this = this;
@@ -65,7 +65,7 @@ const util = function() {
 			BattleTooltips.hideTooltip();
 		};
 		_proto.showTooltip = function showTooltip(html, elem, type, dataAttributes) {
-			this.placeTooltip(html, elem, null, type, dataAttributes);
+			this.placeTooltip(html, elem, true, type, dataAttributes);
 			return true;
 		};
 		_proto.placeTooltip = function placeTooltip(innerHTML, hoveredElem, notRelativeToParent, type, dataAttributes) {
@@ -91,7 +91,7 @@ const util = function() {
 				wrapper.id = "tooltipwrapper";
 				wrapper.setAttribute("role", "tooltip");
 				document.body.appendChild(wrapper);
-				wrapper.addEventListener("click", function(e) {
+				wrapper.addEventListener("click", function() {
 					try {
 						const selection = window.getSelection();
 						if (selection.type === 'Range')	return;
@@ -117,7 +117,7 @@ const util = function() {
 					y = height + 1;
 				}
 				wrapper.style.top = y + "px";
-			} else if (y < 75) {
+			} else if (y < 70) {
 				y = hoveredY2 + height + 5;
 				if (y < document.documentElement.clientHeight) {
 					wrapper.style.top = y + "px";
@@ -246,9 +246,18 @@ const util = function() {
 		return safeId;
 	}
 
-	const loadRandomsData = function(format, urls) {
-		const randomsDataUrl = urls.randomsDataUrl[format];
-		return fetch(randomsDataUrl)
+	const loadLadderData = function(format, url) {
+		return fetch(url + format + ".json")
+			.then(response => response.json())
+	}
+
+	const loadRandomsData = function(format, url) {
+		return fetch(url[format])
+			.then(response => response.json())
+	}
+
+	const loadRatingsData = function(name, url) {
+		return fetch(url + name + ".json")
 			.then(response => response.json())
 	}
 	
@@ -295,8 +304,10 @@ const util = function() {
 		filterObject,
 		getSettings,
 		getMostSimilarString,
-		getNearestRelativeElement,
+		loadLadderData,
 		loadRandomsData,
+		loadRatingsData,
+		getNearestRelativeElement,
 		pruneCalculations,
 		randomNumbersGenerator,
 		replaceIdWithSafeId,

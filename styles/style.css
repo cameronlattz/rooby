@@ -1,4 +1,4 @@
-.tooltip .damage, .tooltip .failure {
+.tooltip .damage, .tooltip .failure, .tooltip .info {
     float: right;
 }
 .tooltip .section .calculator {
@@ -88,4 +88,22 @@ div#backdropBottom.big-gen.no-border {
 }
 .tooltip .section {
     background-color: transparent;
+}
+.green {
+    color: #070;
+}
+.red {
+    color: #800;
+}
+#tooltipwrapper div.tooltip-trainer {
+    width: 200px;
+}
+#tooltipwrapper div.tooltip-trainer .section {
+    display: block;
+    padding: unset;
+    margin: unset;
+    margin-top: 0.5em;
+}
+#tooltipwrapper div.tooltip-trainer .section:first-child {
+    margin-top: unset;
 }

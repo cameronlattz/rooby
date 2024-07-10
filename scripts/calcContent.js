@@ -267,7 +267,7 @@
             setInput.value = button.oldName;
             setInput.dispatchEvent(new Event("change", { "bubbles": true }));
             setSelector.querySelector(".select2-chosen").innerHTML = setInput.value;
-            if (!!button.oldMoves) for (let i = 0; i < button.oldMoves.length; i++) {
+            if (button.oldMoves) for (let i = 0; i < button.oldMoves.length; i++) {
                 moves[i].value = button.oldMoves[i];
                 moves[i].dispatchEvent(new Event("change", { "bubbles": true }));
             }

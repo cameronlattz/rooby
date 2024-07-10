@@ -50,10 +50,8 @@
     let _level100PokemonNumbers;
     let _sleepProbabilityByPokemon;
     let _paralyzeProbabilityByPokemon;
-    let _pokemonIdByNumber = {};
     let _pokemonNameByNumber = {};
     let _pokemonTypesByNumber = {};
-    let _pokemonNumbersByType = {};
     let _pokemonNumbersByTypeWeakness = {};
     let _spammableWeaknessesByPokemon = {};
     let _dittoNumber;
@@ -66,16 +64,10 @@
         const capitalizeFirstLetter = function(str) {
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
-        const types = pokemons.map(p => p.types).flat().filter((value, index, array) => array.indexOf(value) === index);
         _pokemons = pokemons;
         _level100PokemonNumbers = pokemons.filter(p => p.level === 100).map(p => p.number);
-        _pokemonIdByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.id}), {});
         _pokemonNameByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.name}), {});
         _pokemonTypesByNumber = pokemons.reduce((a, p) => ({ ...a, [p.number]: p.types}), {});
-        _pokemonNumbersByType = types
-            .reduce((a, t) => ({ ...a, [t]: pokemons
-                .filter(p => p.types.includes(t))
-                .map(p => p.number)}), {});
         _pokemonNumbersByTypeWeakness = consts.spammableTypes
             .map(t => capitalizeFirstLetter(t))
             .reduce((a, t) => ({ ...a, [t]: pokemons
@@ -88,11 +80,11 @@
         const sleepMoves = Object.keys(consts.moves).filter(m => consts.moves[m].status === "slp");
         _sleepProbabilityByPokemon = pokemons
             .filter(p => p.moves.some(m => sleepMoves.includes(m.id)))
-            .reduce((a, p, i) => ({ ...a, [p.number]: p.moves.filter(m => sleepMoves.includes(m.id))[0].probability}), {});
+            .reduce((a, p) => ({ ...a, [p.number]: p.moves.filter(m => sleepMoves.includes(m.id))[0].probability}), {});
         const paralyzeMoves = Object.keys(consts.moves).filter(m => consts.moves[m].status === "par");
         _paralyzeProbabilityByPokemon = pokemons
             .filter(p => p.moves.some(m => paralyzeMoves.includes(m.id)))
-            .reduce((a, p, i) => ({ ...a, [p.number]: p.moves.filter(m => paralyzeMoves.includes(m.id))[0].probability}), {});
+            .reduce((a, p) => ({ ...a, [p.number]: p.moves.filter(m => paralyzeMoves.includes(m.id))[0].probability}), {});
         _dittoNumber = pokemons.find(p => p.id === "ditto").number;
         await saved;
     }
@@ -126,20 +118,6 @@
             storageValues[arg1] = arg2;
         }
         await chrome.storage.local.set({[storageKey]: storageValues});
-    }
-
-    const deleteStorage = async function(storageKey, value) {
-        let storageValues = await getStorage(storageKey);
-        if (storageValues == void 0) return false;
-        if (value == void 0) {
-            storageValues = {};
-        }
-        else {
-            if (storageValues[value] == void 0) return false;
-            delete storageValues[value];
-        }
-        await chrome.storage.local.set({key: storageValues});
-        return true;
     }
 
     const pruneOddsStorage = async function(saveMonNumbers) {
@@ -504,11 +482,11 @@
                     }
                 }
                 const sleeperOdds = _sleepProbabilityByPokemon[pokemonNumber];
-                if (!!sleeperOdds) {
+                if (sleeperOdds) {
                     teamTotal["Sleep"] = (1 - (1 - (teamTotal["Sleep"] || 0)) * (1-sleeperOdds));
                 }
                 const paralyzerOdds = _paralyzeProbabilityByPokemon[pokemonNumber];
-                if (!!paralyzerOdds) {
+                if (paralyzerOdds) {
                     teamTotal["Paralysis"] = (1 - (1 - (teamTotal["Paralysis"] || 0)) * (1-paralyzerOdds));
                 }
             }
