@@ -385,9 +385,10 @@ window.roobyCalc = function() {
 				else if ((pokemonStats.stats.hp - pokemon.exactHealth) % 256 === 255) return { failureRate: 1 };
 			}
 			else {
+				if (pokemon.healthRemainingPercent === 100) return { failureRate: 1 };
 				const actualMin = Math.floor((pokemon.healthRemainingPercent - 1) / 100 * pokemonStats.stats.hp);
 				const actualMax = Math.ceil(pokemon.healthRemainingPercent / 100 * pokemonStats.stats.hp);
-				for (let healthValue = actualMin; healthValue <= actualMax; healthValue++) {
+				for (let healthValue = actualMin; healthValue < actualMax; healthValue++) {
 					if ((pokemonStats.stats.hp - healthValue) % 256 === 255) {
 						return { failureRate: 1/(1 + actualMax - actualMin) };
 					}

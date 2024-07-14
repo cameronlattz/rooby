@@ -27,7 +27,7 @@
         "run_at": "document_start"    
       },
       {
-        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/calculator.js", "scripts/playContent.js"],
+        "js": ["scripts/unpkg.com_@smogon_calc@0.7.0_dist_production.min.js", "scripts/unpkg.com_@smogon_calc@0.7.0_dist_data_production.min.js", "scripts/util.js", "scripts/consts.js", "scripts/calculator.js", "scripts/playUtil.js", "scripts/playContent.js"],
         "css": ["styles/style.css"],
         "matches": [
           "https://play.pokemonshowdown.com/*",

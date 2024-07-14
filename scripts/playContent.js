@@ -11,6 +11,8 @@
     let _settings = JSON.parse(JSON.stringify(consts.defaultSettings));
     let _ratings = [];
     let _ladders = [];
+    let _results = {};
+    let _winRates = {};
     const _playUrl = consts.urls.gameUrls[0];
     const _playRoomSelector = "div[id^=room-battle-gen1]:not([style*=\"display: none\"]:not([style*=\"display:none\"]";
     const _page = window.location.hostname.split(".")[0];
@@ -58,7 +60,7 @@
     })();
 
     window.onload = async function () {
-        _settings = await util.getSettings() || _settings;
+        _settings = await util.getStorage("settings") || _settings;
         updateBackdrop(document.querySelector(".backdrop"));
         for (const img of Array.from(document.querySelectorAll("img"))) {
             updateSprite(img);
@@ -121,7 +123,7 @@
                     showMoves(event.target, value);
                 }
                 else if (value.startsWith("/export")) {
-                    const tabElement = playUtil.getParentRoomElement(event.target);
+                    const tabElement = playUtil.getParentRoomElement(event.target, _page);
                     const tab = playUtil.getTabIdByRoomElement(tabElement);
                     const randomNumber = util.randomNumbersGenerator(Date.now());
                     const uid = (randomNumber + "").replace("0.", "");
@@ -130,6 +132,12 @@
                         function: "exportTeams",
                         args: { tab: tab, targetUid: uid }
                     });
+                }
+                else if (value.startsWith("/personalwr")) {
+                    showWinRate(event.target, true);
+                }
+                else if (value.startsWith("/opponentwr")) {
+                    showWinRate(event.target, false);
                 }
             }
         });
@@ -161,6 +169,7 @@
                     const damageCalc = roobyCalc.damage(pokemon, null, moveName);
                     if (damageCalc.failureRate > 0 && args.healthRemainingPercent !== 100) {
                         moveButton.classList.add("recovery-failure");
+                        moveButton.setAttribute("title", (damageCalc.failureRate*100).toFixed(2) + "%  chance a recovery move will fail");
                     }
                     moveButton.setAttribute("data-failure-rate", damageCalc.failureRate);
                 }
@@ -192,6 +201,7 @@
             _randomSprites[tab].shiny = shinySprites[randomNumbers[3]] + "-shiny";
             _randomBackdrop[tab] = consts.backdrops[randomNumbers[4]];
         }
+        getWinRates();
     }
 
     const elementInserted = function (element) {
@@ -208,17 +218,24 @@
                 const tabElement = currentTab.querySelector(".text");
                 if (tabElement == void 0) return;
                 gametype = tabElement.innerText;
-                roomElement = playUtil.getParentRoomElement(element);
+                roomElement = playUtil.getParentRoomElement(element, _page);
             }
             else if (_page === "replay") {
                 gametype = document.title.split(":")[0];
-                roomElement = playUtil.getParentRoomElement(element);
+                roomElement = playUtil.getParentRoomElement(element, _page);
             }
             if (roomElement == void 0) return;
             if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement != void 0) {
                 if (element.classList.contains("trainer")) {
                     updateIcons(element);
-                    loadRatings(roomElement);
+                    loadRatings(element);
+                    addUserLink(element);
+                    const isRight = playUtil.getIsRightByChildElement(element);
+                    const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
+                    if (opponentTrainerElement) {
+                        const opponentTrainerName = playUtil.getTrainerNameByElement(opponentTrainerElement).replace(/\s/g,'').toLowerCase();;
+                        getResults(opponentTrainerName);
+                    }
                     if (gametype.replace(/\s/g, "").toLowerCase().indexOf("randombattle") !== -1 && (_page === "play" || _page === "replay")) {
                         calculateUnrevealedPokemon(element, roomElement);
                     }
@@ -230,18 +247,42 @@
                     updateBackdrop(element);
                     setTimeout(function (elem) { updateBackdrop(elem); }, 0, element);
                 }
+                else if (element.classList.contains("battle-history") && element.innerHTML.indexOf(" won the battle!") !== -1) {
+                    if (document.querySelector(".usernametext")) {
+                        const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
+                        const leftTrainerElement = playUtil.getTrainerElementBySide(roomElement, false);
+                        const leftName = playUtil.getTrainerNameByElement(leftTrainerElement).replace(/\s/g,'').toLowerCase();
+                        const rightTrainerElement = playUtil.getTrainerElementBySide(roomElement, true);
+                        const rightName = playUtil.getTrainerNameByElement(rightTrainerElement).replace(/\s/g,'').toLowerCase();
+                        if (loggedInName === leftName || loggedInName === rightName) {
+                            const winnerName = element.children[0].innerHTML.split(" won the battle!")[0].replace(/\s/g,'').toLowerCase();
+                            const opponentName = loggedInName === leftName ? rightName : leftName;
+                            const result = loggedInName === winnerName ? 1 : -1;
+                            const tabId = playUtil.getTabIdByRoomElement(roomElement);
+                            const winnerTrainerElement = loggedInName === leftName ? leftTrainerElement : rightTrainerElement;
+                            const opponentTrainerElement = loggedInName === leftName ? rightTrainerElement : leftTrainerElement;
+                            const pokemons = playUtil.getRevealedPokemonIds(winnerTrainerElement);
+                            const opponentPokemons = playUtil.getRevealedPokemonIds(opponentTrainerElement);
+                            saveResult(opponentName, tabId, result, pokemons, opponentPokemons);
+                        }
+                    }
+                }
                 else if (element.classList.contains("message-error")) {
                     const isOdds = element.innerText.startsWith("The command \"/odds");
                     const isMoveSets = element.innerText.startsWith("The command \"/movesets");
                     const isMoves = element.innerText.startsWith("The command \"/moves");
                     const isExport = element.innerText.startsWith("The command \"/export");
+                    const isPersonalWR = element.innerText.startsWith("The command \"/personalwr");
+                    const isOpponentWR = element.innerText.startsWith("The command \"/opponentwr");
                     let command;
                     if (isOdds) command = "odds";
                     else if (isMoveSets) command = "movesets";
                     else if (isMoves) command = "moves";
                     else if (isExport) command = "export";
-                    if (isOdds || isMoveSets || isMoves || isExport) {
-                        playUtil.removeChatError(element, command);
+                    else if (isPersonalWR) command = "personalwr";
+                    else if (isOpponentWR) command = "opponentwr";
+                    if (isOdds || isMoveSets || isMoves || isExport || isPersonalWR || isOpponentWR) {
+                        removeChatError(element, command);
                     }
                 }
                 else {
@@ -250,6 +291,12 @@
                     const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                     if (trainerElement == void 0) return;
                     const trainerName = playUtil.getTrainerNameByElement(trainerElement);
+                    if (isRight) {
+                        const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
+                        const opponentPokemonId = playUtil.getActivePokemonId(opponentTrainerElement);
+                        const opponentTrainerName = playUtil.getTrainerNameByElement(trainerElement);
+                        recoveryFailureCheck(tab, opponentTrainerName, opponentPokemonId, isRight);
+                    }
                     if (element.classList.contains("statbar")) {
                         const pokemonId = playUtil.getActivePokemonId(trainerElement);
                         if (pokemonId == void 0) return;
@@ -257,7 +304,7 @@
                         const pokemonLevel = playUtil.getLevelFromStatElement(statElement);
                         setLevels(pokemonLevel, tab, trainerName, pokemonId);
                     }
-                    else if (element.classList.contains("controls") && element.querySelector(".switchmenu") != void 0) {
+                    else if (element.classList.contains("controls") && !!element.querySelector(".switchmenu")) {
                         if (gametype.replace(/\s/g, "").toLowerCase().indexOf("randombattle") === -1 || (_page !== "play" && _page !== "replay")) {
                             return;
                         }
@@ -265,25 +312,40 @@
                             _hiddenDitto[tab] = trainerName;
                         }
                         const pokemonId = playUtil.getActivePokemonId(trainerElement);
-                        playUtil.recoveryFailureCheck(tab, trainerName, pokemonId);
+                        recoveryFailureCheck(tab, trainerName, pokemonId, false);
                     }
                 }
             }
         }
     }
 
-    const loadRatings = function (roomElement) {
-        const trainerElements = roomElement.querySelectorAll(".trainer");
-        const trainerName = playUtil.getTrainerNameByElement(trainerElements[0]).replace(/\s/g,'').toLowerCase();
-        const opponentName = playUtil.getTrainerNameByElement(trainerElements[1]).replace(/\s/g,'').toLowerCase();
-        util.loadRatingsData(trainerName, consts.urls.ratingsDataUrl).then(data => {
-            _ratings[trainerName] = data.ratings;
-            _ratings[trainerName].registertime = data.registertime;
-        });
-        util.loadRatingsData(opponentName, consts.urls.ratingsDataUrl).then(data => {
-            _ratings[opponentName] = data.ratings;
-            _ratings[opponentName].registertime = data.registertime;
-        });
+    const addUserLink = function (trainerElement) {
+        const trainerNameWithSpaces = playUtil.getTrainerNameByElement(trainerElement, false);
+        const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
+        trainerElement.querySelector("strong").innerHTML = "<a href=\"https://pokemonshowdown.com//users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";       
+    }
+
+    const removeChatError = function (inputElement, command) {
+        setTimeout(function (command) {
+            const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
+            const errorElement = Array.from(chatBox.querySelectorAll(".message-error"))
+                .findLast(c => c.innerHTML.startsWith("The command \"/" + command + "\" does not exist."));
+            if (errorElement != void 0) errorElement.remove();
+        }, 0, command);
+    }
+
+    const loadRatings = function (trainerElement) {
+        const trainerName = playUtil.getTrainerNameByElement(trainerElement).replace(/\s/g,'').toLowerCase();
+        if (!_ratings[trainerName] || _ratings[trainerName].accessTime + 60000 < Date.now()) {
+            _timeoutIds[trainerName + "ratings"] = util.debounce(function () {
+                util.loadRatingsData(trainerName, consts.urls.ratingsDataUrl).then(data => {
+                    if (data == void 0) return;
+                    _ratings[trainerName] = data.ratings;
+                    _ratings[trainerName].registertime = data.registertime;
+                    _ratings[trainerName].accessTime = Date.now();
+                });
+            }, 20, _timeoutIds[trainerName + "ratings"]);
+        }
     }
 
     const loadLadderData = function() {
@@ -291,8 +353,56 @@
             ? window.location.pathname.split("-")[1]
             : window.location.pathname.split("-")[0].substring(1);
         util.loadLadderData(format, consts.urls.laddersUrl).then(data => {
-            _ladders[format] = data.toplist.map(t => t.userid);
+            if (data) _ladders[format] = data.toplist.map(t => t.userid);
         });
+    }
+
+    const recoveryFailureCheck = function (tab, trainerName, pokemonId, isRight) {
+        if (!_settings.miscCalculator || pokemonId == void 0) return;
+        const dexMons = Object.keys(consts.pokedex).map(k => consts.pokedex[k]);
+        const pokemonName = dexMons.find(p => p.id == pokemonId).name;
+        if (pokemonName == void 0) return;
+        const roomElement = playUtil.getRoomElementByTabId(tab);
+        const statElement = playUtil.getStatElementBySide(roomElement, isRight);
+        const { healthRemainingPercent } = playUtil.getPokemonHealth(null, statElement);
+        let failureRate = 0;
+        if (isRight) {
+            if (!_pokemons) return;
+            const hasRecoveryMove = _pokemons.find(p => p.name === pokemonName).moves.some(m => consts.recoveryMoves.includes(m.id));
+            if (hasRecoveryMove) {
+                const level = playUtil.getLevelFromStatElement(statElement);
+                const pokemon = {
+                    id: pokemonId,
+                    level: level,
+                    healthRemainingPercent: healthRemainingPercent
+                }
+                const damageCalc = roobyCalc.damage(pokemon, null, "Rest");
+                if (damageCalc.failureRate > 0 && healthRemainingPercent !== 100) {
+                    failureRate = damageCalc.failureRate;
+                }
+            }
+            const strong = statElement.querySelector("strong");
+            if (failureRate > 0) {
+                strong.classList.add("recovery-failure");
+                strong.setAttribute("title", (failureRate * 100).toFixed(2) + "%  chance a recovery move will fail");
+            }
+            else {
+                strong.classList.remove("recovery-failure");
+                strong.removeAttribute("title");
+            }
+        }
+        else {
+            window.postMessage({
+                function: "getExactHealthByName",
+                args: {
+                    name: pokemonName,
+                    healthRemainingPercent: healthRemainingPercent,
+                    isRight: false,
+                    tab: tab,
+                    trainerName: trainerName
+                }
+            });
+        }
     }
 
     const calculateUnrevealedPokemon = function (trainer, roomElement) {
@@ -349,7 +459,7 @@
     }
 
     const showUnrevealedPokemon = function (element) {
-        const roomElement = playUtil.getParentRoomElement(element);
+        const roomElement = playUtil.getParentRoomElement(element, _page);
         const isRight = playUtil.getIsRightByChildElement(element);
         const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
         const trainerName = playUtil.getTrainerNameByElement(trainerElement);
@@ -399,38 +509,30 @@
         });
     }
 
-    const getPokemonHealth = function (healthElement, statElement) {
-        if (!healthElement) {
-            const healthRemainingPercent = Number.parseInt(statElement.querySelector(".hptext").childNodes[0].nodeValue.trim().replace("%", ""));
-            return { healthRemainingPercent };
-        }
-        else {
-            const healthText = healthElement.nodeValue;
-            const paranthesisIndex = healthText.indexOf("(");
-            if (paranthesisIndex !== -1) {
-                const fullStats = healthText.substring(paranthesisIndex + 1, healthText.lastIndexOf(")"));
-                const healthNumber = Number.parseInt(fullStats.substring(0, fullStats.indexOf("/")));
-                const totalNumber = Number.parseInt(fullStats.substring(fullStats.indexOf("/") + 1));
-                return {
-                    exactHealth: healthNumber,
-                    healthRemainingPercent: healthNumber / totalNumber * 100
-                }
-            }
-            else {
-                const healthRemainingPercent = Number.parseInt(healthText.trim().replace("%", ""));
-                return { healthRemainingPercent };
-            }
-        }
-    }
-
     const showTrainerTooltip = function (element) {
-        const calculateWinRate = function (rating, opponentRating) {
+        const calculateWinRate = function (ratings, opponentRatings) {
+            const eloWinRate = calculateEloWinRate(ratings?.elo, opponentRatings?.elo);
+            const glickoWinRate = calculateGlickoWinRate(ratings?.rpr, ratings?.rprd, opponentRatings?.rpr, opponentRatings?.rprd);
+            return isNaN(glickoWinRate) ? eloWinRate : (eloWinRate + glickoWinRate) / 2;
+        }
+    
+        const calculateGlickoWinRate = function (rating, ratingDeviation, opponentRating, opponentRatingDeviation) {
+            if (!rating || !ratingDeviation || !opponentRating || !opponentRatingDeviation) return;
+            const pi2 = 9.8696044;
+            const q = 0.00575646273;    
+            const rd = Math.sqrt(ratingDeviation * ratingDeviation + opponentRatingDeviation * opponentRatingDeviation);
+            const g = 1 / Math.sqrt(1 + 3 * q * q * rd * rd / pi2);
+            return 1 / (1 + Math.pow(10, -1 * g * (rating - opponentRating) / 400));
+        }
+    
+        const calculateEloWinRate = function (rating, opponentRating) {
             if (!rating || rating < 1000) rating = 1000;
             if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
             const eloWinRate = 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
             return eloWinRate;
         }
-        function calculateElo(rating, opponentRating, result) {
+
+        const calculateElo = function(rating, opponentRating, result) {
             if (!rating || rating < 1000) rating = 1000;
             if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
             let k = 50;
@@ -442,21 +544,24 @@
 				}
 			} else if (rating > 1300) {
 				k = 40;
-			}
-            var winRate = calculateWinRate(rating, opponentRating);
+			} else if (rating >= 1600) {
+                k = 32;
+            }
+            var winRate = calculateEloWinRate(rating, opponentRating);
             let change = Math.round(k * (((result + 1) / 2) - winRate));
             if (rating + change < 1000) change = 1000 - rating;
             return change;
         }
+
         if (_settings.trainerTooltip === false) return;
-        const trainerName = playUtil.getTrainerNameByElement(element.closest(".trainer"));
-        const userId = trainerName.replace(/\s/g,'').toLowerCase();
+        const trainerNameWithSpaces = playUtil.getTrainerNameByElement(element.closest(".trainer"), false);
+        const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
         const format = window.location.pathname.startsWith("/battle")
             ? window.location.pathname.split("-")[1]
             : window.location.pathname.split("-")[0].substring(1);
         let html = _ladders[format] && _ladders[format].includes(userId)
-            ? "<h2>" + trainerName + " <span class=\"info\">#" + (_ladders[format].indexOf(userId) + 1) + "</span></h2><p>"
-            : "<h2>" + trainerName + "</h2><p>";
+            ? "<h2>" + trainerNameWithSpaces + " <span class=\"info\">#" + (_ladders[format].indexOf(userId) + 1) + "</span></h2><p>"
+            : "<h2>" + trainerNameWithSpaces + "</h2><p>";
         let elo = element.hasAttribute("title")
             ? element.getAttribute("title").substring(element.getAttribute("title").indexOf("Rating: ") + 8)
             : "Loading...";
@@ -465,16 +570,15 @@
         let gxe = "Loading...";
         let glicko = "Loading...";
         let winProbability = "Loading...";
-        const wins = 0;
-        const losses = 0;
-        let winLoss = wins + "-" + losses;
+        const { wins, draws, losses } = _results[userId] ?? { wins: 0, draws: 0, losses: 0 };
+        let winLoss = wins + "-" + draws + "-" + losses;
         if (wins + losses > 0) winLoss += " (" + Math.round(wins / (wins + losses) * 100) + "%)";
-        const isRight = playUtil.getIsRightByChildElement(element);
-        const roomElement = playUtil.getParentRoomElement(element);
+        const roomElement = playUtil.getParentRoomElement(element, _page);
         if (_ratings[userId]) {
-            if (elo === "Loading..." || _page === "play") elo = _ratings[userId][format]?.elo ? Math.round(_ratings[userId][format].elo) : 1000;
+            const isRight = playUtil.getIsRightByChildElement(element);
             const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
             const opponentId = playUtil.getTrainerNameByElement(opponentTrainerElement).replace(/\s/g,'').toLowerCase();
+            if (elo === "Loading..." || _page === "play") elo = _ratings[userId][format]?.elo ? Math.round(_ratings[userId][format].elo) : 1000;
             const eloLoss = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, -1);
             const eloTie = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 0);
             const eloGain = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 1);
@@ -484,14 +588,14 @@
             glicko = _ratings[userId][format]?.rpr
                 ? Math.round(_ratings[userId][format].rpr) + " ± " + Math.round(_ratings[userId][format].rprd)
                 : "N/A";
-            const winRate = calculateWinRate(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo);
+            const winRate = calculateWinRate(_ratings[userId][format], _ratings[opponentId][format]);
             winProbability = "<span class=\"" + (winRate > .5 ? "green" : "red") + "\">" + (winRate * 100).toFixed(2) + "%</span>";
             eloChange = "<span class=\"green\">+" + Math.round(eloGain)
                 + "</span> / " + (eloTie > 0 ? "+" : "") + Math.round(eloTie)
                 + " / <span class=\"red\">" + Math.round(eloLoss) + "</span>";
         }
         html += "<span class=\"section\">Registered:<span class=\"info\">" + age + "</span></span>"
-            + "<span class=\"section\">Elo:<span class=\"info\">" + elo + "</span><br>"
+            + "<span class=\"section\">Elo:<span class=\"info\"><b>" + elo + "</b></span><br>"
             + "GXE:<span class=\"info\">" + gxe + "</span><br>"
             + "Glicko-1:<span class=\"info\">" + glicko + "</span></span>";
         html += "<span class=\"section\">Win probability:<span class=\"info\">" + winProbability + "</span><br>";
@@ -499,11 +603,12 @@
             html += "Elo change:<span class=\"info\">" + eloChange + "</span></span>";
         }
         if (document.querySelector(".usernametext")) {
-            html += "<span class=\"section\">Personal Record:<span class=\"info\">" + winLoss + "</span></span>";
+            const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
+            if (loggedInName !== userId) html += "<span class=\"section\">Personal record:<span class=\"info\">" + winLoss + "</span></span>";
         }
         html += "</p>";
         const tooltip = util.battleTooltips;
-        tooltip.showTooltip(html, element, "trainer", { trainer: trainerName });
+        tooltip.showTooltip(html, element, "trainer", { trainer: userId });
         const title = element.getAttribute("title");
         element.removeAttribute("title");
         element.addEventListener("mouseout", function (event) {
@@ -538,7 +643,7 @@
                 }
                 let isActive = true;
                 if (tooltip != void 0) {
-                    const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip);
+                    const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip, _pokemons);
                     const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
                     isActive = playUtil.getActivePokemonId(trainerElement) === pokemonId;
                 }
@@ -571,7 +676,7 @@
                 const opponentStatElement = playUtil.getStatElementBySide(roomElement, !isRight);
                 const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
 
-                let { exactHealth, healthRemainingPercent } = getPokemonHealth(tooltip.querySelectorAll("p")[0].childNodes[1], statElement);
+                let { exactHealth, healthRemainingPercent } = playUtil.getPokemonHealth(tooltip.querySelectorAll("p")[0].childNodes[1], statElement);
                 const tab = playUtil.getTabIdByRoomElement(roomElement);
                 const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                 const trainerName = playUtil.getTrainerNameByElement(trainerElement);
@@ -593,7 +698,7 @@
                 const opponentTrainerName = playUtil.getTrainerNameByElement(opponentTrainerElement);
                 if (isActive && transformedId !== pokemon.id) {
                     pokemon.transformedId = transformedId,
-                        pokemon.transformedLevel = playUtil.getPokemonLevelById(tab, opponentTrainerName, transformedId, !isRight)
+                        pokemon.transformedLevel = playUtil.getPokemonLevelById(_levels, _timeoutIds, tab, opponentTrainerName, transformedId, !isRight)
                     if (pokemon.transformedLevel == void 0) return;
                 }
                 const opponentPokemonId = playUtil.getActivePokemonId(opponentTrainerElement);
@@ -612,7 +717,7 @@
                     const opponentTransformedId = playUtil.getTransformedId(opponentTrainerElement, opponentStatElement)
                     if (opponentTransformedId !== opponent.id) {
                         opponent.transformedId = opponentTransformedId;
-                        opponent.transformedLevel = playUtil.getPokemonLevelById(tab, trainerName, opponentTransformedId, !isRight);
+                        opponent.transformedLevel = playUtil.getPokemonLevelById(_levels, _timeoutIds, tab, trainerName, opponentTransformedId, !isRight);
                         if (opponent.transformedLevel == void 0) return;
                     }
                     pokemon.opponent = opponent;
@@ -633,7 +738,7 @@
                 showMoveTooltip(section, tooltip, roomElement, tooltipPokemon);
             }
             else {
-                const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip);
+                const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip, _pokemons);
                 const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
                 const tooltipPokemon = buildTooltipPokemon(tooltip, roomElement, isRight, pokemonId);
                 if (tooltipPokemon) showPokemonTooltip(section, tooltip, roomElement, isRight, tooltipPokemon);
@@ -917,6 +1022,87 @@
         }
     }
 
+    const showWinRate = function (target, isPersonal) {
+        let output = "<b>" + (isPersonal ? "Personal" : "Opponent") + " winrates:</b><hr>";
+        for (const pokemon of _pokemons) {
+            if (_winRates.wins == void 0) _winRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+            const wins = (isPersonal ? _winRates.wins[pokemon.number] : _winRates.opponentWins[pokemon.number]) ?? 0;
+            const losses = (isPersonal ? _winRates.losses[pokemon.number] : _winRates.opponentLosses[pokemon.number]) ?? 0;
+            if (wins + losses > 0) {
+                const percent = ((wins / (wins + losses)) * 100).toFixed(2) + "%";
+                output += pokemon.name + ": " + percent + " (" + (wins + losses) + " matches)<br>";
+            }
+        }
+        playUtil.chatOutput(target, output, "rooby-chat-info");
+    }
+
+    const getWinRates = async function() {
+        let savedWinRates = await util.getStorage("winRates");
+        if (savedWinRates == void 0) savedWinRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+        else savedWinRates = savedWinRates.winRates;
+        _winRates = savedWinRates;
+        return savedWinRates;
+    }
+
+    const saveResult = async function(opponentName, tab, result, pokemons, opponentPokemons) {
+        let savedResults = await util.getStorage("results");
+        if (savedResults == void 0) savedResults = {};
+        else savedResults = savedResults.results;
+        if (savedResults[opponentName] == void 0) savedResults[opponentName] = {};
+        if (savedResults[opponentName][tab] == void 0) {
+            savedResults[opponentName][tab] = result;
+            if (_results[opponentName] == void 0) _results[opponentName] = { wins: 0, draws: 0, losses: 0 };
+            if (result === 1) _results[opponentName].wins++;
+            else if (result === 0) _results[opponentName].draws++;
+            else if (result === -1) _results[opponentName].losses++;
+            util.saveStorage("results", savedResults);
+            let savedWinRates = await getWinRates();
+            for (const pokemon of pokemons) {
+                const pokemonNumber = consts.pokedex[pokemon].num;
+                if (result === -1) {
+                    if (savedWinRates.losses[pokemonNumber] == void 0) savedWinRates.losses[pokemonNumber] = 0;
+                    savedWinRates.losses[pokemonNumber]++;
+                }
+                else if (result === 1) {
+                    if (savedWinRates.wins[pokemonNumber] == void 0) savedWinRates.wins[pokemonNumber] = 0;
+                    savedWinRates.wins[pokemonNumber]++;
+                }
+            }
+            for (const pokemon of opponentPokemons) {
+                const pokemonNumber = consts.pokedex[pokemon].num;
+                if (result === 1) {
+                    if (savedWinRates.opponentLosses[pokemonNumber] == void 0) savedWinRates.opponentLosses[pokemonNumber] = 0;
+                    savedWinRates.opponentLosses[pokemonNumber]++;
+                }
+                else if (result === -1) {
+                    if (savedWinRates.opponentWins[pokemonNumber] == void 0) savedWinRates.opponentWins[pokemonNumber] = 0;
+                    savedWinRates.opponentWins[pokemonNumber]++;
+                }
+            }
+            _winRates = savedWinRates;
+            util.saveStorage("winRates", savedWinRates);
+        }
+    }
+
+    const getResults = async function(opponentName) {
+        let savedResults = await util.getStorage("results");
+        if (savedResults == void 0) savedResults = {};
+        else savedResults = savedResults.results;
+        if (savedResults[opponentName] != void 0) {
+            let wins = 0;
+            let draws = 0;
+            let losses = 0;
+            for (const tab in savedResults[opponentName]) {
+                const result = savedResults[opponentName][tab];
+                if (result === 1) wins++;
+                else if (result === 0) draws++;
+                else if (result === -1) losses++;
+            }
+            _results[opponentName] = { wins: wins, draws: draws, losses: losses };
+        }
+        else _results[opponentName] = { wins: 0, draws: 0, losses: 0 };
+    }
+
     const exportTeams = function (uid, teamInfos) {
 
         const exportTeam = function (team, trainerName) {
@@ -970,7 +1156,7 @@
 
             const randomFunction = function (e) {
                 _settings.shinyPercentage = e.target.value;
-                util.saveSetting("shinyPercentage", _settings.shinyPercentage);
+                util.saveStorage("settings", "shinyPercentage", _settings.shinyPercentage);
                 const imgs = Array.from(document.querySelectorAll(".innerbattle")).map(b => Array.from(b.querySelectorAll("img"))).flat();
                 for (const img of imgs) {
                     updateSprite(img);
@@ -978,7 +1164,7 @@
             };
             const backdropFunction = function (e) {
                 _settings.backdrop = e.target.value;
-                util.saveSetting("backdrop", _settings.backdrop);
+                util.saveStorage("settings", "backdrop", _settings.backdrop);
                 const backdrops = document.querySelectorAll(".backdrop");
                 for (const backdrop of backdrops) {
                     updateBackdrop(backdrop);
@@ -988,7 +1174,7 @@
                 const checkbox = e.target.childNodes[0];
                 if (checkbox == void 0) return;
                 _settings[checkbox.name] = checkbox.checked;
-                util.saveSetting(checkbox.name, _settings[checkbox.name]);
+                util.saveStorage("settings", checkbox.name, _settings[checkbox.name]);
             };
             const spritesFunction = function (e) {
                 changeSprites(e.target.value, e.target.getAttribute("name"));
@@ -1002,7 +1188,7 @@
 
             const changeSprites = function (gen, type) {
                 _settings.sprites[type] = gen;
-                util.saveSetting("sprites", _settings.sprites);
+                util.saveStorage("settings", "sprites", _settings.sprites);
                 if (gen == 0) gen = "gen1";
                 if (type === "shiny") {
                     _settings.sprites["shiny"] = gen;
@@ -1020,8 +1206,8 @@
                 }
             }
 
-            parent.after(playUtil.buildSettingsP("Backdrop", "backdrop", className, consts.backdrops, _settings.backdrop, backdropFunction));
-            parent.after(playUtil.buildSettingsP("Randoms shiny percentage", "shiny_percentage", className, null, _settings.shinyPercentage, randomFunction, 
+            parent.after(playUtil.buildSettingsP("Backdrop", "backdrop", className, consts.backdrops, _settings.backdrop ?? consts.defaultSettings.backdrop, backdropFunction));
+            parent.after(playUtil.buildSettingsP("Randoms shiny percentage", "shiny_percentage", className, null, _settings.shinyPercentage ?? consts.defaultSettings.shinyPercentage, randomFunction, 
                 { type: "number", max: 100, min: 0, value: 0, id: "shinyPercentage" }));
             for (const key of ["shiny", "icons", "back", "front"]) {
                 const noPastGensCheckbox = document.querySelector("[name='nopastgens']");
@@ -1115,11 +1301,11 @@
         }
         if (element != null && element.style.backgroundImage != void 0) {
             let backdrop = _settings.backdrop;
-            const roomElement = playUtil.getParentRoomElement(element);
+            const roomElement = playUtil.getParentRoomElement(element, _page);
             if (roomElement == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
             const tab = playUtil.getTabIdByRoomElement(roomElement);
             if (_randomSprites[tab] == void 0) initializeTab(tab);
-            if (_settings.backdrop == 0) backdrop = "fx/bg-gen1.png";
+            if (!_settings.backdrop || _settings.backdrop == 0) backdrop = "fx/bg-gen1.png";
             else if (_settings.backdrop == 1) backdrop = _randomBackdrop[tab];
             buildBackdropBottom(roomElement, tab, backdrop);
             element.style = "background-image: url('" + _playUrl + "/" + backdrop + "'); display: block; opacity: 0.8;";
@@ -1129,7 +1315,7 @@
     const updateIcons = function (trainer) {
         let iconsPrefix = _settings.sprites.icons || 0;
         if (trainer == void 0) return;
-        const roomElement = playUtil.getParentRoomElement(trainer);
+        const roomElement = playUtil.getParentRoomElement(trainer, _page);
         const tab = playUtil.getTabIdByRoomElement(roomElement);
         if (tab == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
         if (_randomSprites[tab] == void 0) initializeTab(tab);
@@ -1173,7 +1359,7 @@
             if (src.indexOf("back") !== -1) {
                 key = "back";
             }
-            const roomElement = playUtil.getParentRoomElement(element);
+            const roomElement = playUtil.getParentRoomElement(element, _page);
             const tab = playUtil.getTabIdByRoomElement(roomElement);
             if (tab == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
             if (_randomSprites[tab] == void 0) initializeTab(tab);
@@ -1266,21 +1452,6 @@
         }
     }
 
-    const getLevels = function (tab, trainerName, pokemonId) {
-        if (!!_levels[tab] && !!_levels[tab][trainerName] && !!_levels[tab][trainerName][pokemonId]) {
-            return _levels[tab][trainerName][pokemonId];
-        }
-        else if (!!_levels[tab] && !!_levels[tab][trainerName] && pokemonId == void 0) {
-            return _levels[tab][trainerName];
-        }
-        else if (!!_levels[tab] && trainerName == void 0 && pokemonId == void 0) {
-            return _levels[tab];
-        }
-        else if (tab == void 0 && trainerName == void 0 && pokemonId == void 0) {
-            return _levels;
-        }
-    }
-
     const setLevels = function (levels, tab, trainerName, pokemonId) {
         if (tab != void 0 && trainerName != void 0 && pokemonId != void 0) {
             _levels[tab] = _levels[tab] || {};
@@ -1298,261 +1469,4 @@
             _levels = levels;
         }
     }
-
-    const playUtil = function () {
-        const buildSettingsP = function (labelText, labelName, labelClassName, options, selectedValue, event, attributes) {
-            const isSelect = attributes == void 0;
-            const isCheckbox = !isSelect && attributes.type === "checkbox";
-            attributes = attributes || {};
-            const p = document.createElement("p");
-            const label = document.createElement("label");
-            label.className = labelClassName;
-            if (!isCheckbox) label.innerHTML = labelText + ": ";
-            const input = isSelect ? document.createElement("select") : document.createElement("input");
-            input.addEventListener("change", event);
-            if (!isSelect) {
-                for (const attribute in attributes) {
-                    let value = attributes[attribute];
-                    if (attribute === "checked") {
-                        if (value === false) continue;
-                        else value = "checked";
-                    }
-                    input.setAttribute(attribute, value);
-                }
-                if (!isCheckbox) input.value = selectedValue;
-                else label.addEventListener("click", event);
-            }
-            input.name = labelName;
-            if (isSelect) {
-                const selectOptions = [];
-                if (labelName !== "shiny") {
-                    const defaultOption = document.createElement("option");
-                    defaultOption.innerHTML = "Default";
-                    defaultOption.value = "0";
-                    selectOptions.push(defaultOption);
-                }
-                const randomBattleOption = document.createElement("option");
-                randomBattleOption.innerHTML = "Random per battle";
-                randomBattleOption.value = "1";
-                selectOptions.push(randomBattleOption);
-                for (const optionObject of options) {
-                    const option = document.createElement("option");
-                    if (typeof optionObject === "string" || optionObject instanceof String) {
-                        option.innerHTML = optionObject;
-                    }
-                    else {
-                        option.innerHTML = optionObject.text;
-                        option.value = optionObject.value;
-                    }
-                    selectOptions.push(option);
-                }
-                const optionIndex = selectOptions.findIndex(so => so.value === selectedValue);
-                for (const selectOption of selectOptions) {
-                    input.appendChild(selectOption);
-                }
-                input.selectedIndex = optionIndex;
-            }
-            label.appendChild(input);
-            if (isCheckbox) {
-                label.innerHTML += " " + labelText;
-            }
-            p.appendChild(label);
-            return p;
-        }
-
-        const chatOutput = function (inputElement, message, className) {
-            const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
-            const div = document.createElement("div");
-            const classNames = ["rooby-chat"];
-            if (className != void 0) classNames.push(className);
-            div.classList.add(...classNames);
-            div.innerHTML = message;
-            chatBox.appendChild(div);
-            const scrollDiv = document.createElement("div");
-            div.after(scrollDiv)
-            scrollDiv.scrollIntoView();
-            scrollDiv.remove();
-        }
-
-        const removeChatError = function (inputElement, command) {
-            setTimeout(function (command) {
-                const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
-                const errorElement = Array.from(chatBox.querySelectorAll(".message-error"))
-                    .findLast(c => c.innerHTML.startsWith("The command \"/" + command + "\" does not exist."));
-                if (errorElement != void 0) errorElement.remove();
-            }, 0, command);
-        }
-
-        const recoveryFailureCheck = function (tab, trainerName, pokemonId) {
-
-            const getPokemonNameById = function (pokemonId) {
-                const pokemons = Object.keys(consts.pokedex).map(k => consts.pokedex[k]);
-                const pokemon = pokemons.find(p => p.id == pokemonId);
-                return pokemon != void 0 ? pokemon.name : null;
-            }
-
-            if (pokemonId == void 0) return;
-            const pokemonName = getPokemonNameById(pokemonId);
-            if (pokemonName == void 0) return;
-            const roomElement = playUtil.getRoomElementByTabId(tab);
-            const statElement = playUtil.getStatElementBySide(roomElement, false);
-            const { healthRemainingPercent } = getPokemonHealth(null, statElement);
-            window.postMessage({
-                function: "getExactHealthByName",
-                args: {
-                    name: pokemonName,
-                    healthRemainingPercent: healthRemainingPercent,
-                    isRight: false,
-                    tab: tab,
-                    trainerName: trainerName
-                }
-            });
-        }
-
-        const getActivePokemonId = function (trainerElement) {
-            const labelSpan = Array.from(trainerElement.querySelectorAll(".picon.has-tooltip"))
-                .find(span => span.getAttribute("aria-label").endsWith("(active)"));
-            if (labelSpan == void 0) return;
-            const activeIconNameWithoutNick = labelSpan.getAttribute("aria-label").substring(0, labelSpan.getAttribute("aria-label").lastIndexOf(" ("));
-            const name = activeIconNameWithoutNick.indexOf("(") !== -1
-                ? activeIconNameWithoutNick.substring(activeIconNameWithoutNick.lastIndexOf(" (") + 2, activeIconNameWithoutNick.length - 1)
-                : activeIconNameWithoutNick;
-            return playUtil.getPokemonIdByName(name);
-        }
-
-        const getIsRightByChildElement = function (element) {
-            const trainerOrStatElement = element.closest(".trainer, .statbar");
-            return ["lstatbar", "trainer-far"].some(c => trainerOrStatElement.classList.contains(c));
-        }
-
-        const getIsTransformedByStatElement = function (trainerStatElement) {
-            if (trainerStatElement == void 0) return false;
-            return Array.from(trainerStatElement.querySelectorAll("span")).some(e => e.innerText === "Transformed");
-        }
-
-        const getLevelFromStatElement = function (statElement) {
-            const levelSmall = Array.from(statElement.querySelectorAll("small")).find(s => s.innerHTML.charAt(0) === "L");
-            return levelSmall != void 0 && levelSmall.innerHTML != void 0
-                ? Number.parseInt(levelSmall.innerHTML.substring(1))
-                : 100;
-        }
-
-        const getParentRoomElement = function (element) {
-            return _page === "play"
-                ? element.closest(".ps-room-opaque")
-                : document.querySelector(".battle").parentElement;
-        }
-
-        const getPokemonNameFromTooltip = function (tooltip) {
-            const h2 = tooltip.querySelector("h2");
-            const possibleNickedNameElementHtmls = Array.from(h2.querySelectorAll("small"))
-                .filter(s => s.innerHTML.startsWith("(") && s.innerHTML.endsWith(")"))
-                .map(e => e.innerHTML.substring(1, e.innerHTML.length - 1));
-            const nickedPokemon = possibleNickedNameElementHtmls.map(h => _pokemons.find(p => p.name === h)).find(p => p != void 0);
-            const tooltipPokemonName = nickedPokemon != void 0
-                ? nickedPokemon.name
-                : h2.childNodes[0].nodeValue.trim();
-            return tooltipPokemonName;
-        }
-
-        const getPokemonIdByName = function (pokemonName) {
-            const pokedexMons = Object.keys(consts.pokedex).map(k => { const dexEntry = consts.pokedex[k]; dexEntry.id = k; return dexEntry; });
-            const pokemon = pokedexMons.find(p => p.name === pokemonName);
-            return pokemon != void 0 ? pokemon.id : null;
-        }
-
-        const getPokemonLevelById = function (tab, trainerName, pokemonId, isRight) {
-            if (tab === "") tab = "replay";
-            _timeoutIds[tab][trainerName] = util.debounce(function () {
-                window.postMessage({
-                    function: "getPokemonLevels",
-                    args: {
-                        isRight: isRight,
-                        tab: tab
-                    }
-                });
-            }, 20, _timeoutIds[tab][trainerName]);
-            const level = getLevels(tab, trainerName, pokemonId);
-            if (level != void 0) return level;
-        }
-
-        const getRevealedPokemonIds = function (trainerElement) {
-            const labelSpans = Array.from(trainerElement.querySelectorAll(".picon.has-tooltip"));
-            if (labelSpans.length === 0) return;
-            return labelSpans
-                .map(l => l.getAttribute("aria-label"))
-                .map(n => n.indexOf("(") !== -1 ? n.substring(0, n.lastIndexOf(" (")) : n)
-                .map(n => getPokemonIdByName(n));
-        }
-
-        const getRoomElementByTabId = function (tabId) {
-            return Array.from(document.querySelectorAll(".ps-room")).find(e => e.id.endsWith(tabId));
-        }
-
-        const getStatElementBySide = function (roomElement, isRight) {
-            return roomElement.querySelector(isRight ? ".lstatbar" : ".rstatbar");
-        }
-
-        const getTabIdByRoomElement = function (roomElement) {
-            return roomElement.id.substring(roomElement.id.lastIndexOf("-") + 1, roomElement.id.length);
-        }
-
-        const getTrainerNameByElement = function (trainerElement) {
-            return trainerElement.querySelector("strong").innerText.replace(/\s/g, '');
-        }
-
-        const getTrainerElementByName = function (roomElement, trainerName, getOpponent = false) {
-            const trainerElements = roomElement.querySelectorAll(".trainer");
-            for (const trainerElement of trainerElements) {
-                const tName = getTrainerNameByElement(trainerElement);
-                if (!trainerName.localeCompare(tName) !== getOpponent) return trainerElement;
-            }
-            return null;
-        }
-
-        const getTrainerElementBySide = function (roomElement, isRight) {
-            return roomElement.querySelector(isRight ? ".trainer-far" : ".trainer-near");
-        }
-
-        const getTransformedId = function (trainerElement, statElement) {
-            const isTransformed = getIsTransformedByStatElement(statElement);
-            if (!isTransformed) return getActivePokemonId(trainerElement);
-            const roomElement = trainerElement.closest(".ps-room");
-            const transformEntries = Array.from(roomElement.querySelector(".battle-log").querySelectorAll(".battle-history"))
-                .map(e => e.innerText)
-                .filter(e => e.indexOf("transformed into") !== -1);
-            const lastTransformEntry = getIsRightByChildElement(trainerElement)
-                ? transformEntries.findLast(e => e.startsWith("The opposing"))
-                : transformEntries.findLast(e => !e.startsWith("The opposing"));
-            if (lastTransformEntry != void 0) {
-                const transformedIntoName = lastTransformEntry.substring(lastTransformEntry.indexOf("transformed into") + 17, lastTransformEntry.length - 2);
-                const pokemonId = playUtil.getPokemonIdByName(transformedIntoName);
-                return pokemonId;
-            }
-            return null;
-        }
-
-        return {
-            buildSettingsP,
-            chatOutput,
-            removeChatError,
-            recoveryFailureCheck,
-            getActivePokemonId,
-            getIsRightByChildElement,
-            getIsTransformedByStatElement,
-            getLevelFromStatElement,
-            getParentRoomElement,
-            getPokemonIdByName,
-            getPokemonLevelById,
-            getPokemonNameFromTooltip,
-            getRevealedPokemonIds,
-            getRoomElementByTabId,
-            getTabIdByRoomElement,
-            getTrainerElementByName,
-            getTrainerElementBySide,
-            getTrainerNameByElement,
-            getTransformedId,
-            getStatElementBySide
-        }
-    }();
 })();

@@ -258,7 +258,7 @@ window.util = function() {
 
 	const loadRatingsData = function(name, url) {
 		return fetch(url + name + ".json")
-			.then(response => response.json())
+			.then(response => response.json());
 	}
 	
 	const pruneCalculations = function(pokemons) {
@@ -285,16 +285,23 @@ window.util = function() {
 		}, delay);
 	}
 
-	const getSettings = async function() {
-		const result = await chrome.storage.local.get("settings");
-		if (result.settings == void 0) return consts.defaultSettings;
-		return result.settings;
+	const getStorage = async function(key) {
+		const result = await chrome.storage.local.get(key);
+		if (result == void 0 && key === "settings") return consts.defaultSettings;
+		return key != null ? result[key] : result;
 	}
 
-	const saveSetting = async function(key, value) {
-		const settings = await getSettings();
-		settings[key] = value;
-		await chrome.storage.local.set({settings: settings});
+	const saveStorage = async function(key, subkey, value) {
+		if (value == void 0) {
+			value = subkey;
+			subkey = void 0;
+		}
+		let storage = await getStorage(key) ?? {};
+		if (subkey != void 0) {
+			storage[subkey] = value;
+		}
+		else storage[key] = value;
+		await chrome.storage.local.set({ [key]: storage });
 	}
 
 	return {
@@ -302,7 +309,7 @@ window.util = function() {
 		capitalizeFirstLetter,
 		debounce,
 		filterObject,
-		getSettings,
+		getStorage,
 		getMostSimilarString,
 		loadLadderData,
 		loadRandomsData,
@@ -311,6 +318,6 @@ window.util = function() {
 		pruneCalculations,
 		randomNumbersGenerator,
 		replaceIdWithSafeId,
-		saveSetting
+		saveStorage
 	}
 }();
