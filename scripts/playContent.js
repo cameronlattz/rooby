@@ -1358,6 +1358,7 @@
                 if (backgroundSrc.indexOf("pokeball") !== -1) src += _playUrl + "/sprites/digimon/sprites/xy" + srcEnd;
                 else src += chrome.runtime.getURL("images/digimon" + srcEnd);
             }
+            else if (iconsPrefix === "art" && backgroundSrc.indexOf("pokeball") !== -1) src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
             else if (iconsPrefix === "gen5") src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
             else src += _playUrl + "/sprites/pokemon" + srcEnd;
             picon.style.background = src;
@@ -1447,7 +1448,7 @@
                     const replaceSpace = key === "back" && pokemonId.indexOf("nidoran") !== -1;
                     typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, replaceSpace, typos)
                 }
-                if (spriteSrc.indexOf("spaceworld") !== -1) {
+                if (spriteSrc.indexOf("spaceworld") !== -1 || spriteSrc.indexOf("art") !== -1) {
                     urlEnd = chrome.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
                     urlStart = "";
                     spriteSrc = "";

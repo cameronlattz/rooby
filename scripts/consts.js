@@ -136,20 +136,20 @@ const consts = function() {
 			icons: "pokemon",
 			shiny: "gen2spaceworld-shiny"
 		},
-		// gen1artrb: {
-		// 	front: true,
-		// 	back: "gen1-back",
-		// 	icons: "pokemon",
-		// 	substitute: "gen1",
-		// 	shiny: "gen2spaceworld-shiny"
-		// },
-		// gen1artrg: {
-		// 	front: true,
-		// 	back: "gen1-back",
-		// 	icons: "pokemon",
-		// 	substitute: "gen1",
-		// 	shiny: "gen2spaceworld-shiny"
-		// },
+		gen1artrb: {
+			front: true,
+			back: "gen1-back",
+			icons: "art",
+			substitute: "gen1",
+			shiny: "gen2spaceworld-shiny"
+		},
+		gen1artrg: {
+			front: true,
+			back: "gen1-back",
+			icons: "art",
+			substitute: "gen1",
+			shiny: "gen2spaceworld-shiny"
+		},
 		gen1rgb: {
 			back: true,
 			icons: "pokemon",
