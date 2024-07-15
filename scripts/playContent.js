@@ -139,6 +139,9 @@
                 else if (value.startsWith("/opponentwr")) {
                     showWinRate(event.target, false);
                 }
+                else if (value.startsWith("/rooby")) {
+                    showRooby(event.target);
+                }
             }
         });
 
@@ -268,21 +271,12 @@
                     }
                 }
                 else if (element.classList.contains("message-error")) {
-                    const isOdds = element.innerText.startsWith("The command \"/odds");
-                    const isMoveSets = element.innerText.startsWith("The command \"/movesets");
-                    const isMoves = element.innerText.startsWith("The command \"/moves");
-                    const isExport = element.innerText.startsWith("The command \"/export");
-                    const isPersonalWR = element.innerText.startsWith("The command \"/personalwr");
-                    const isOpponentWR = element.innerText.startsWith("The command \"/opponentwr");
-                    let command;
-                    if (isOdds) command = "odds";
-                    else if (isMoveSets) command = "movesets";
-                    else if (isMoves) command = "moves";
-                    else if (isExport) command = "export";
-                    else if (isPersonalWR) command = "personalwr";
-                    else if (isOpponentWR) command = "opponentwr";
-                    if (isOdds || isMoveSets || isMoves || isExport || isPersonalWR || isOpponentWR) {
-                        removeChatError(element, command);
+                    const commands = [ "odds", "movesets", "moves", "export", "personalwr", "opponentwr", "rooby"];
+                    for (const command of commands) {
+                        if (element.innerText.startsWith("The command \"/" + command)) {
+                            removeChatError(element, command);
+                            break;
+                        }
                     }
                 }
                 else {
@@ -322,7 +316,9 @@
     const addUserLink = function (trainerElement) {
         const trainerNameWithSpaces = playUtil.getTrainerNameByElement(trainerElement, false);
         const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
-        trainerElement.querySelector("strong").innerHTML = "<a href=\"https://pokemonshowdown.com//users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";       
+        trainerElement.querySelector("strong").innerHTML = _settings.trainerTooltip === false
+            ? trainerNameWithSpaces
+            : "<a href=\"https://pokemonshowdown.com//users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";
     }
 
     const removeChatError = function (inputElement, command) {
@@ -344,7 +340,7 @@
                     _ratings[trainerName].registertime = data.registertime;
                     _ratings[trainerName].accessTime = Date.now();
                 });
-            }, 20, _timeoutIds[trainerName + "ratings"]);
+            }, 100, _timeoutIds[trainerName + "ratings"]);
         }
     }
 
@@ -613,7 +609,7 @@
         element.removeAttribute("title");
         element.addEventListener("mouseout", function (event) {
             tooltip.hideTooltip(event.target);
-            element.setAttribute("title", title);
+            if (title) element.setAttribute("title", title);
         });
     }
 
@@ -1003,7 +999,7 @@
         const args = value.split(" ");
         if (args.length === 1 || args[1] === "help") {
             const example = "<b>Example:</b> /moves Slowbro";
-            playUtil.chatOutput(target, "Use the command /movesets followed by the name of the Pokémon.<br>" + example);
+            playUtil.chatOutput(target, "Use the command /moves followed by the name of the Pokémon.<br>" + example);
         }
         else {
             const name = util.getMostSimilarString(args[1], _pokemons.map(p => p.name));
@@ -1033,6 +1029,18 @@
                 output += pokemon.name + ": " + percent + " (" + (wins + losses) + " matches)<br>";
             }
         }
+        playUtil.chatOutput(target, output, "rooby-chat-info");
+    }
+
+    const showRooby = function (target) {
+        let output = "<b>RooBY Help</b><hr>";
+        output += "<b>/odds</b> - Calculate the odds of a Pokémon or type appearing in a random battle. Use /odds help for more info.<br>";
+        output += "<b>/movesets</b> - Show all possible movesets for a Pokémon. Use /movesets help for more info.<br>";
+        output += "<b>/moves</b> - Show all possible moves for a Pokémon. Use /moves help for more info.<br>";
+        output += "<b>/personalwr</b> - Show your personal winrate with individual Pokémon.<br>";
+        output += "<b>/opponentwr</b> - Show your opponents' winrate with individual Pokémon.<br>";
+        output += "<b>/export</b> - Export the current battle's teams to the <a href=\"https://calc.pokemonshowdown.com/\" target=\"_new\">Showdown Damage Calculator</a>.<br>";
+        output += "<b>/rooby</b> - Show this help message.<br>";
         playUtil.chatOutput(target, output, "rooby-chat-info");
     }
 
@@ -1175,6 +1183,12 @@
                 if (checkbox == void 0) return;
                 _settings[checkbox.name] = checkbox.checked;
                 util.saveStorage("settings", checkbox.name, _settings[checkbox.name]);
+                if (checkbox.name === "trainerTooltip") {
+                    const trainerElements = document.querySelectorAll(".trainer");
+                    for (const trainerElement of trainerElements) {
+                        addUserLink(trainerElement);
+                    }
+                }
             };
             const spritesFunction = function (e) {
                 changeSprites(e.target.value, e.target.getAttribute("name"));
@@ -1353,8 +1367,8 @@
     const updateSprite = function (element) {
         const src = element.getAttribute("src");
         if (_settings.useModernSprites === true || (_page !== "play" && _page != "replay") || src.indexOf("/types/") !== -1) return;
-        const urlStart = _playUrl + "/sprites/";
-        if (src.startsWith(urlStart) && _settings.sprites["front"] != void 0) {
+        let urlStart = _playUrl + "/sprites/";
+        if (src.indexOf("/sprites/") !== -1 && _settings.sprites["front"] != void 0) {
             let key = "front";
             if (src.indexOf("back") !== -1) {
                 key = "back";
@@ -1433,7 +1447,12 @@
                     const replaceSpace = key === "back" && pokemonId.indexOf("nidoran") !== -1;
                     typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, replaceSpace, typos)
                 }
-                urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
+                if (spriteSrc.indexOf("spaceworld") !== -1) {
+                    urlEnd = chrome.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
+                    urlStart = "";
+                    spriteSrc = "";
+                }
+                else urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
             }
 
             if (spriteSrc.indexOf("digimon/sprites/pokemon-back-shiny") !== -1) {

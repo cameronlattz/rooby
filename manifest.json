@@ -45,6 +45,6 @@
     ],
     "web_accessible_resources": [{
       "matches": ["<all_urls>"],
-      "resources": ["images/icon-128.png", "images/digimonicons-sheet.png", "images/gen5icons-sheet.png", "images/gen5icons-pokeball-sheet.png"]
+      "resources": ["images/icon-128.png", "images/digimonicons-sheet.png", "images/gen5icons-sheet.png", "images/gen5icons-pokeball-sheet.png", "images/sprites/*.png"]
     }]
   }

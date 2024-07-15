@@ -134,27 +134,49 @@ const consts = function() {
 			front: true,
 			back: true,
 			icons: "pokemon",
-			shiny: "gen2-shiny"
+			shiny: "gen2spaceworld-shiny"
 		},
+		// gen1artrb: {
+		// 	front: true,
+		// 	back: "gen1-back",
+		// 	icons: "pokemon",
+		// 	substitute: "gen1",
+		// 	shiny: "gen2spaceworld-shiny"
+		// },
+		// gen1artrg: {
+		// 	front: true,
+		// 	back: "gen1-back",
+		// 	icons: "pokemon",
+		// 	substitute: "gen1",
+		// 	shiny: "gen2spaceworld-shiny"
+		// },
 		gen1rgb: {
 			back: true,
 			icons: "pokemon",
 			substitute: "gen1",
-			shiny: "gen2-shiny"
+			shiny: "gen2spaceworld-shiny"
 		},
 		gen1rb: {
 			front: true,
 			back: "gen1rgb-back",
 			icons: "pokemon",
 			substitute: "gen1",
-			shiny: "gen2-shiny"
+			shiny: "gen2spaceworld-shiny"
 		},
 		gen1rg: {
 			front: true,
 			back: "gen1rgb-back",
 			icons: "pokemon",
 			substitute: "gen1",
-			shiny: "gen2-shiny"
+			shiny: "gen2spaceworld-shiny"
+		},
+		gen2spaceworld: {
+			front: true,
+			back: true,
+			icons: "pokemon",
+			substitute: "gen1",
+			shiny: true,
+			local: true
 		},
 		gen2: {
 			front: true,

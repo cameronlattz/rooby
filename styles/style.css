@@ -114,3 +114,6 @@ div#backdropBottom.big-gen.no-border {
 .trainer > strong > a:hover {
     text-decoration: underline;
 }
+.backdrop.mid-gen ~ .leftbar .trainer {
+    transform: translateY(10px);
+}
