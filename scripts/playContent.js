@@ -1033,14 +1033,15 @@
     }
 
     const showRooby = function (target) {
-        let output = "<b>RooBY Help</b><hr>";
+        let output = "<b>RooBY Commands</b><hr>";
         output += "<b>/odds</b> - Calculate the odds of a Pokémon or type appearing in a random battle. Use /odds help for more info.<br>";
         output += "<b>/movesets</b> - Show all possible movesets for a Pokémon. Use /movesets help for more info.<br>";
         output += "<b>/moves</b> - Show all possible moves for a Pokémon. Use /moves help for more info.<br>";
         output += "<b>/personalwr</b> - Show your personal winrate with individual Pokémon.<br>";
         output += "<b>/opponentwr</b> - Show your opponents' winrate with individual Pokémon.<br>";
         output += "<b>/export</b> - Export the current battle's teams to the <a href=\"https://calc.pokemonshowdown.com/\" target=\"_new\">Showdown Damage Calculator</a>.<br>";
-        output += "<b>/rooby</b> - Show this help message.<br>";
+        output += "<b>/rooby</b> - Show this message.<br>";
+        output += "Click the <i class=\"fa fa-cog\"></i> Options button on the top right to change RooBY settings.<br>";
         playUtil.chatOutput(target, output, "rooby-chat-info");
     }
 
@@ -1260,7 +1261,7 @@
             parent.after(playUtil.buildSettingsP("Disable damage calculator", "damageCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.damageCalculator === false }));
             const strongP = document.createElement("p");
             const strong = document.createElement("strong");
-            strong.innerHTML = "RooBY - Generation 1";
+            strong.innerHTML = "RooBY (Generation 1)";
             strongP.appendChild(strong);
             parent.after(strongP);
             parent.after(document.createElement("hr"));
@@ -1460,13 +1461,19 @@
                 spriteSrc = spriteSrc.replace("pokemon-back-shiny", "pokemon-shiny-back");
             }
             element.style.visibility = "hidden";
-            setTimeout(function () {
+            const scaleFunc = function (element) {
                 element.style.visibility = "visible";
-                element.style.transform = "scaleY(" + element.naturalHeight * 2 / 192 + ") scaleX(" + element.naturalWidth * 2 / 192 + ")";
-            }, 0);
-            element.onload = function () {
-                element.style.visibility = "visible";
-                element.style.transform = "scaleY(" + element.naturalHeight * 2 / 192 + ") scaleX(" + element.naturalWidth * 2 / 192 + ")";
+                element.style.transform = "scaleY(" + Math.min(element.naturalHeight * 2 / 192, 1) + ") scaleX(" + Math.min(element.naturalWidth * 2 / 192, 1) + ")";
+            }
+            setTimeout(function () {  scaleFunc(element); }, 0);
+            element.onload = function () { scaleFunc(element); }
+            if (urlEnd.indexOf("art") !== -1) {
+                element.classList.add("hd");
+                element.classList.remove("pixelated");
+            }
+            else {
+                element.classList.remove("hd");
+                element.classList.add("pixelated");
             }
             element.setAttribute("src", urlStart + spriteSrc + urlEnd);
         }

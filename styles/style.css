@@ -117,3 +117,7 @@ div#backdropBottom.big-gen.no-border {
 .backdrop.mid-gen ~ .leftbar .trainer {
     transform: translateY(10px);
 }
+.pixelated.hd {
+    image-rendering: optimizeQuality;
+    transform: unset;
+}
