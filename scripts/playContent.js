@@ -231,6 +231,7 @@
             if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement != void 0) {
                 if (element.classList.contains("trainer")) {
                     updateIcons(element);
+                    updateTrainerIcon(element);
                     loadRatings(element);
                     addUserLink(element);
                     const isRight = playUtil.getIsRightByChildElement(element);
@@ -258,6 +259,7 @@
                         const rightTrainerElement = playUtil.getTrainerElementBySide(roomElement, true);
                         const rightName = playUtil.getTrainerNameByElement(rightTrainerElement).replace(/\s/g,'').toLowerCase();
                         if (loggedInName === leftName || loggedInName === rightName) {
+                            document.querySelector("#randomAvatarButton").click();
                             const winnerName = element.children[0].innerHTML.split(" won the battle!")[0].replace(/\s/g,'').toLowerCase();
                             const opponentName = loggedInName === leftName ? rightName : leftName;
                             const result = loggedInName === winnerName ? 1 : -1;
@@ -544,7 +546,7 @@
                 k = 32;
             }
             var winRate = calculateEloWinRate(rating, opponentRating);
-            let change = Math.round(k * (((result + 1) / 2) - winRate));
+            let change = k * (((result + 1) / 2) - winRate);
             if (rating + change < 1000) change = 1000 - rating;
             return change;
         }
@@ -1157,7 +1159,23 @@
 
     const settingsPopup = function (element) {
         const avatarButton = element.querySelector("[name='avatars']");
-        if (avatarButton == void 0) return;
+        if (avatarButton == void 0) {
+            const avatarList = element.querySelector(".avatarlist");
+            if (avatarList && !avatarList.querySelector(".custom")) {
+                const button = document.createElement("button");
+                button.setAttribute("id", "randomAvatarButton");
+                button.setAttribute("style", "background-image: url(" + chrome.runtime.getURL("images/sprites/trainers/randomguy.png") + ");")
+                button.classList.add("option", "pixelated", "custom");
+                button.setAttribute("title", "Random per battle");
+                const avatarButtons = Array.from(avatarList.querySelectorAll("button"));
+                avatarList.prepend(button);
+                button.addEventListener("click", function () {
+                    const randomButton = avatarButtons[Math.floor(Math.random() * avatarButtons.length)];
+                    randomButton.click();
+                });
+            }
+            return;
+        };
         if (element.querySelectorAll(".sprite-selector").length === 0) {
             const noPastGensCheckbox = document.querySelector("[name='nopastgens']");
             const className = noPastGensCheckbox.parentNode.className;
@@ -1188,6 +1206,12 @@
                     const trainerElements = document.querySelectorAll(".trainer");
                     for (const trainerElement of trainerElements) {
                         addUserLink(trainerElement);
+                    }
+                }
+                else if (checkbox.name === "animateTrainer") {
+                    const trainerElements = document.querySelectorAll(".trainer");
+                    for (const trainerElement of trainerElements) {
+                        updateTrainerIcon(trainerElement);
                     }
                 }
             };
@@ -1254,6 +1278,7 @@
                 const p = playUtil.buildSettingsP(title, key, className + " sprite-selector", options, _settings.sprites[key], spritesFunction);
                 noPastGensCheckbox.parentNode.parentNode.after(p);
             }
+            parent.after(playUtil.buildSettingsP("Disable avatar animations", "animateTrainer", className, null, null, disableFunction, { type: "checkbox", checked: _settings.animateTrainer === false }));
             parent.after(playUtil.buildSettingsP("Disable trainer tooltips", "trainerTooltip", className, null, null, disableFunction, { type: "checkbox", checked: _settings.trainerTooltip === false }));
             parent.after(playUtil.buildSettingsP("Disable miscellaneous calculators", "miscCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.miscCalculator === false }));
             parent.after(playUtil.buildSettingsP("Disable unrevealed calculator", "unrevealedCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.unrevealedCalculator === false }));
@@ -1364,6 +1389,24 @@
             else src += _playUrl + "/sprites/pokemon" + srcEnd;
             picon.style.background = src;
         }
+    }
+
+    const updateTrainerIcon = function (element) {
+        if ((_page !== "play" && _page != "replay") || !element.classList.contains("trainer")) return;
+        const trainer = element.querySelector(".trainersprite");
+        const style = trainer.getAttribute("style");
+        const src = style.substring(style.indexOf("url(") + 5, style.indexOf(")"));
+        let trainerName = src.split("/").pop().split(".")[0];
+        if (!consts.trainerSprites.includes(trainerName)) return;
+        let newUrl = "https://play.pokemonshowdown.com/sprites/trainers/" + trainerName + ".png";
+        if (_settings.animateTrainer) {
+            const roomElement = playUtil.getParentRoomElement(element, _page);
+            const won = Array.from(roomElement.querySelectorAll(".battle-history")).find(b => b.innerHTML.indexOf(" won the battle!") !== -1)
+            if (won && trainerName === "rosa" || trainerName === "nate") trainerName = trainerName + "2";
+            newUrl = chrome.runtime.getURL("images/sprites/trainers/" + trainerName + ".png");
+        }
+        const newSrc = "background-image:url(" + newUrl + ")";
+        trainer.setAttribute("style", newSrc);
     }
 
     const updateSprite = function (element) {

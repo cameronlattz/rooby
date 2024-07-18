@@ -14,6 +14,7 @@ const consts = function() {
 		unrevealedCalculator: true,
 		miscCalculator: true,
 		trainerTooltip: true,
+		animateTrainer: false,
 		useModernSprites: false
 	};
 
@@ -96,6 +97,22 @@ const consts = function() {
 		"sprites/gen6bgs/bg-orassea.jpg",
 		"sprites/gen6bgs/bg-skypillar.jpg"
 	];
+
+	const trainerSprites = ["acetrainer","acetrainerf","alder","artist","backers","backersf","backpackerf","backpackerm",
+		"baker","battlegirl","beauty-gen5bw2","bellelba","benga","bianca-pwt","bianca","biker","blackbelt","blaine","blue",
+		"brawley","brock","brycen","brycenman","bugsy","burgh","byron","caitlin","candice","cheren-gen5bw2","cheren",
+		"chili","chuck","cilan","clair","clay","clerk-boss","clerk","clerkf","colress","crasherwake","cress","cyclist",
+		"cyclistf","cynthia","dancer","depotagent","doctor","drayden","elesa-gen5bw2","emmet","erika","falkner","fantina",
+		"filenames","fisherman","flannery","gardenia","gentleman","ghetsis","giovanni","grimsley","guitarist","harlequin",
+		"hiker","hilbert-wonderlauncher","hilbert","hilda-wonderlauncher","hilda","hooligans","hoopster","hugh","infielder",
+		"ingo","irs-gen5bw2","janine","janitor","jasmine","juan","lady","lance","lass","lenora","linebacker","liza",
+		"ltsurge","madame","maid","marlon","marshal","maylene","misty","morty","musician","n","nate","nate_wonderlauncher",
+		"norman","nurse","nurseryaide","parasollady","pilot","plasmagrunt","plasmagruntf","pokefan","pokefanf",
+		"pokemonbreeder","pokemonbreederf","pokemonranger","pokemonrangerf","policeman","preschooler","preschoolerf",
+		"pryce","psychic","psychicf","red","richboy","roark","rood","rosa-wonderlauncher","rosa","roughneck","roxanne",
+		"roxie","sabrina","schoolkid","schoolkidf","scientist","scientistf","shadowtriad","shauntal","skyla","smasher",
+		"steven","striker","swimmer","swimmerf","tate","twins","veteran","veteranf","volkner","waiter","waitress","wallace",
+		"wattson","whitney","winona","worker","workerice","youngster","zinzolin"];
 
 	const spriteSets = {
 		afd: {
@@ -3883,6 +3900,7 @@ const consts = function() {
 		specialSetupMoves,
 		spriteSets,
 		statusMoves,
+		trainerSprites,
 		transformedIntoString,
 		typechart,
 		urls: { formatsDataUrl, gameUrls, laddersUrl, ratingsDataUrl, randomsDataUrl }
