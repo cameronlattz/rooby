@@ -24,6 +24,7 @@ const playUtil = function () {
         }
         input.name = labelName;
         if (isSelect) {
+            input.classList.add("button");
             const selectOptions = [];
             if (labelName !== "shiny") {
                 const defaultOption = document.createElement("option");
@@ -72,6 +73,43 @@ const playUtil = function () {
         div.after(scrollDiv)
         scrollDiv.scrollIntoView();
         scrollDiv.remove();
+    }
+
+    const animateAvatar = function (img, attribute, animateTrainer) {
+        const src = img.getAttribute(attribute);
+        const parenthesesIndex = src.indexOf("(");
+        const pngIndex = src.indexOf(".png");
+        const slashIndex = src.lastIndexOf("/") !== -1 ? src.lastIndexOf("/") : src.lastIndexOf("\\");;
+        const prefix = parenthesesIndex !== -1 ? src.substring(0, parenthesesIndex + 1) : "";
+        const postfix = src.substring(pngIndex + 4, src.length);
+        let trainerName = src.substring(slashIndex + 1, pngIndex);
+        if (!consts.animatedTrainerSprites.includes(trainerName)) return;
+        let url = "https://play.pokemonshowdown.com/sprites/trainers/" + trainerName + ".png";
+        if (animateTrainer) {
+            url = chrome.runtime.getURL("images/sprites/trainers/" + trainerName + ".png");
+        }
+        img.setAttribute(attribute, prefix + url + postfix);
+    }
+
+    const changeAvatar = function (name, animateTrainer) {
+        setTimeout(function() {
+            const pmLogs = Array.from(document.querySelectorAll(".pm-log"));
+            for (const pmLog of pmLogs) {
+                const chats = pmLog.querySelectorAll(".chat");
+                for (const chat of chats) {
+                    const img = chat.querySelector("img");
+                    if (!img) continue;
+                    playUtil.animateAvatar(img, "src", animateTrainer);
+                }
+            }
+        }, 1000);
+        console.log(name);
+        window.postMessage({
+            function: "changeAvatar",
+            args: {
+                name: name
+            }
+        });
     }
 
     const getActivePokemonId = function (trainerElement) {
@@ -240,8 +278,10 @@ const playUtil = function () {
     }
 
     return {
+        animateAvatar,
         buildSettingsP,
         chatOutput,
+        changeAvatar,
         getActivePokemonId,
         getIsRightByChildElement,
         getIsTransformedByStatElement,

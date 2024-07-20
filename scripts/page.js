@@ -14,6 +14,10 @@
         return eval(functionName)(rooms, args);
     }
 
+    this.changeAvatar = function(room, args) {
+        window.app.send("/avatar " + args.name, room);
+    }
+
     this.getExactHealthByName = function(room, args) {
         const pokemon = getPokemonFromData(room, args.isRight, args.name);
         if (pokemon == void 0) return;

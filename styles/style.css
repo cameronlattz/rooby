@@ -121,3 +121,10 @@ div#backdropBottom.big-gen.no-border {
     image-rendering: optimizeQuality;
     transform: unset;
 }
+.backdrop.coromon {
+    background-size: cover;
+    background-position-x: center;
+}
+.backdrop.nauris-amatnieks {
+    background-position-y: -75px;
+}

@@ -113,6 +113,7 @@
             }
             else if (event.target.parentElement.classList.contains("chatbox") && event.target.tagName === "TEXTAREA") {
                 const value = event.target.getAttribute("data-value");
+                if (!value || value.length === "") return;
                 if (value.startsWith("/odds")) {
                     simulateOdds(event.target, value);
                 }
@@ -228,7 +229,7 @@
                 roomElement = playUtil.getParentRoomElement(element, _page);
             }
             if (roomElement == void 0) return;
-            if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement != void 0) {
+            if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement) {
                 if (element.classList.contains("trainer")) {
                     updateIcons(element);
                     updateTrainerIcon(element);
@@ -251,15 +252,17 @@
                     updateBackdrop(element);
                     setTimeout(function (elem) { updateBackdrop(elem); }, 0, element);
                 }
-                else if (element.classList.contains("battle-history") && element.innerHTML.indexOf(" won the battle!") !== -1) {
-                    if (document.querySelector(".usernametext")) {
+                else if (element.classList.contains("battle-history") && document.querySelector(".usernametext")) {
+                    if (element.innerHTML.indexOf("Battle started between ") !== -1 && _page === "play") {
+                        changeAvatar(element);
+                    }
+                    else if (element.innerHTML.indexOf(" won the battle!") !== -1) {
                         const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
                         const leftTrainerElement = playUtil.getTrainerElementBySide(roomElement, false);
                         const leftName = playUtil.getTrainerNameByElement(leftTrainerElement).replace(/\s/g,'').toLowerCase();
                         const rightTrainerElement = playUtil.getTrainerElementBySide(roomElement, true);
                         const rightName = playUtil.getTrainerNameByElement(rightTrainerElement).replace(/\s/g,'').toLowerCase();
                         if (loggedInName === leftName || loggedInName === rightName) {
-                            document.querySelector("#randomAvatarButton").click();
                             const winnerName = element.children[0].innerHTML.split(" won the battle!")[0].replace(/\s/g,'').toLowerCase();
                             const opponentName = loggedInName === leftName ? rightName : leftName;
                             const result = loggedInName === winnerName ? 1 : -1;
@@ -505,6 +508,33 @@
             tooltip.hideTooltip(event.target);
             element.setAttribute("title", "Not revealed");
         });
+    }
+
+    const changeAvatar = function(element) {
+        if (!_settings.randomAvatar || _settings.randomAvatar === 0) return;
+        const tab = playUtil.getParentRoomElement(element, _page);
+        if (!tab) return;
+        const usernameElement = document.querySelector(".usernametext");
+        const trainerElements = tab.querySelectorAll(".trainer");
+        let match = false;
+        for (const trainerElement of trainerElements) {
+            const trainerName = playUtil.getTrainerNameByElement(trainerElement);
+            const loggedInName = usernameElement.innerText.replace(/\s/g,'');
+            if (trainerName == loggedInName) match = true;
+        }
+        if (!match) return;
+        const form = tab.querySelector("form.chatbox");
+        if (!form) return;
+        const histories = tab.querySelectorAll(".battle-log");
+        for (const history of histories) {
+            if (history.innerHTML.indexOf("Avatar changed to:") !== -1) return;
+        }
+        let trainerName = "";
+        while (trainerName.length === 0 || trainerName.indexOf("2") !== -1) {
+            const spriteNames = _settings.randomAvatar === 1 ? consts.trainerSprites : consts.animatedTrainerSprites;
+            trainerName = spriteNames[Math.floor(Math.random() * spriteNames.length)];
+        }
+        playUtil.changeAvatar(trainerName, _settings.animateTrainer);
     }
 
     const showTrainerTooltip = function (element) {
@@ -1161,18 +1191,32 @@
         const avatarButton = element.querySelector("[name='avatars']");
         if (avatarButton == void 0) {
             const avatarList = element.querySelector(".avatarlist");
-            if (avatarList && !avatarList.querySelector(".custom")) {
-                const button = document.createElement("button");
-                button.setAttribute("id", "randomAvatarButton");
-                button.setAttribute("style", "background-image: url(" + chrome.runtime.getURL("images/sprites/trainers/randomguy.png") + ");")
-                button.classList.add("option", "pixelated", "custom");
-                button.setAttribute("title", "Random per battle");
-                const avatarButtons = Array.from(avatarList.querySelectorAll("button"));
-                avatarList.prepend(button);
-                button.addEventListener("click", function () {
-                    const randomButton = avatarButtons[Math.floor(Math.random() * avatarButtons.length)];
-                    randomButton.click();
-                });
+            if (avatarList && !avatarList.querySelector("button[id]")) {
+                const avatarButtons = Array.from(avatarList.querySelectorAll("button:not([id])"));
+                for (const button of avatarButtons) {
+                    button.addEventListener("click", function (e) {
+                        _settings.randomAvatar = 0;
+                        util.saveStorage("settings", "randomAvatar", _settings.randomAvatar);
+                    });
+                }
+                const randomTypes = ["randomTrainer", "randomAnimatedTrainer"];
+                for (const randomType of randomTypes) {
+                    const button = document.createElement("button");
+                    button.setAttribute("id", "randomAvatarButton");
+                    button.setAttribute("style", "background-image: url(" + chrome.runtime.getURL("images/sprites/trainers/" + randomType + ".png") + ");")
+                    button.classList.add("option", "pixelated", "custom");
+                    const animated = randomType === "randomAnimatedTrainer" ? "animated" : "";
+                    button.setAttribute("title", "Random " + animated + " per battle");
+                    button.addEventListener("click", function () {
+                        const sprites = animated.length === 0 ? consts.trainerSprites : consts.animatedTrainerSprites;
+                        const randomSprite = sprites[Math.floor(Math.random() * sprites.length)];
+                        playUtil.changeAvatar(randomSprite, _settings.animateTrainer);
+                        _settings.randomAvatar = animated.length === 0 ? 2 : 1;
+                        util.saveStorage("settings", "randomAvatar", _settings.randomAvatar);
+                        this.parentElement.parentElement.querySelector("[name=close]").click();
+                    });
+                    avatarList.prepend(button);
+                }
             }
             return;
         };
@@ -1212,6 +1256,15 @@
                     const trainerElements = document.querySelectorAll(".trainer");
                     for (const trainerElement of trainerElements) {
                         updateTrainerIcon(trainerElement);
+                    }
+                    const pmLogs = Array.from(document.querySelectorAll(".pm-log"));
+                    for (const pmLog of pmLogs) {
+                        const chats = pmLog.querySelectorAll(".chat");
+                        for (const chat of chats) {
+                            const img = chat.querySelector("img");
+                            if (!img) continue;
+                            playUtil.animateAvatar(img, "src", checkbox.checked);
+                        }
                     }
                 }
             };
@@ -1348,7 +1401,18 @@
             if (!_settings.backdrop || _settings.backdrop == 0) backdrop = "fx/bg-gen1.png";
             else if (_settings.backdrop == 1) backdrop = _randomBackdrop[tab];
             buildBackdropBottom(roomElement, tab, backdrop);
-            element.style = "background-image: url('" + _playUrl + "/" + backdrop + "'); display: block; opacity: 0.8;";
+            let url = _playUrl + "/" + backdrop;
+            if (backdrop.indexOf("coromon") !== -1 || backdrop.indexOf("nauris-amatnieks") !== -1) {
+                url = chrome.runtime.getURL("images/backdrops/" + backdrop);
+                element.classList.add("coromon");
+                if (backdrop.indexOf("nauris-amatnieks") !== -1) element.classList.add("nauris-amatnieks");
+                else element.classList.remove("nauris-amatnieks");
+            }
+            else {
+                element.classList.remove("coromon");
+                element.classList.remove("nauris-amatnieks");
+            }
+            element.style = "background-image: url('" + url + "'); display: block; opacity: 0.8;";
         }
     }
 
@@ -1394,19 +1458,7 @@
     const updateTrainerIcon = function (element) {
         if ((_page !== "play" && _page != "replay") || !element.classList.contains("trainer")) return;
         const trainer = element.querySelector(".trainersprite");
-        const style = trainer.getAttribute("style");
-        const src = style.substring(style.indexOf("url(") + 5, style.indexOf(")"));
-        let trainerName = src.split("/").pop().split(".")[0];
-        if (!consts.trainerSprites.includes(trainerName)) return;
-        let newUrl = "https://play.pokemonshowdown.com/sprites/trainers/" + trainerName + ".png";
-        if (_settings.animateTrainer) {
-            const roomElement = playUtil.getParentRoomElement(element, _page);
-            const won = Array.from(roomElement.querySelectorAll(".battle-history")).find(b => b.innerHTML.indexOf(" won the battle!") !== -1)
-            if (won && trainerName === "rosa" || trainerName === "nate") trainerName = trainerName + "2";
-            newUrl = chrome.runtime.getURL("images/sprites/trainers/" + trainerName + ".png");
-        }
-        const newSrc = "background-image:url(" + newUrl + ")";
-        trainer.setAttribute("style", newSrc);
+        playUtil.animateAvatar(trainer, "style", _settings.animateTrainer);
     }
 
     const updateSprite = function (element) {
