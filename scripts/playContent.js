@@ -136,11 +136,11 @@
                         args: { tab: tab, targetUid: uid }
                     });
                 }
-                else if (value.startsWith("/personalwr")) {
-                    showWinRate(event.target, true);
+                else if (value.startsWith("/winrates")) {
+                    showWinRate(event.target, value);
                 }
                 else if (value.startsWith("/opponentwr")) {
-                    showWinRate(event.target, false);
+                    showWinRate(event.target, value);
                 }
                 else if (value.startsWith("/rooby")) {
                     showRooby(event.target);
@@ -291,7 +291,7 @@
                     }
                 }
                 else if (element.classList.contains("message-error")) {
-                    const commands = [ "odds", "movesets", "moves", "export", "personalwr", "opponentwr", "rooby"];
+                    const commands = [ "odds", "movesets", "moves", "export", "winrates", "rooby"];
                     for (const command of commands) {
                         if (element.innerText.startsWith("The command \"/" + command)) {
                             removeChatError(element, command);
@@ -338,7 +338,7 @@
         const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
         trainerElement.querySelector("strong").innerHTML = _settings.trainerTooltip === false
             ? trainerNameWithSpaces
-            : "<a href=\"https://pokemonshowdown.com//users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";
+            : "<a href=\"https://pokemonshowdown.com/users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";
     }
 
     const removeChatError = function (inputElement, command) {
@@ -354,7 +354,7 @@
         const trainerName = playUtil.getTrainerNameByElement(trainerElement).replace(/\s/g,'').toLowerCase();
         if (!_ratings[trainerName] || _ratings[trainerName].accessTime + 60000 < Date.now()) {
             _timeoutIds[trainerName + "ratings"] = util.debounce(function () {
-                util.loadRatingsData(trainerName, consts.urls.ratingsDataUrl).then(data => {
+                util.loadRatingsData(util.slugify(trainerName), consts.urls.ratingsDataUrl).then(data => {
                     if (data == void 0) return;
                     _ratings[trainerName] = data.ratings;
                     _ratings[trainerName].registertime = data.registertime;
@@ -605,8 +605,8 @@
         const format = window.location.pathname.startsWith("/battle")
             ? window.location.pathname.split("-")[1]
             : window.location.pathname.split("-")[0].substring(1);
-        let html = _ladders[format] && _ladders[format].includes(userId)
-            ? "<h2>" + trainerNameWithSpaces + " <span class=\"info\">#" + (_ladders[format].indexOf(userId) + 1) + "</span></h2><p>"
+        let html = _ladders[format] && _ladders[format].includes(util.slugify(userId))
+            ? "<h2>" + trainerNameWithSpaces + " <span class=\"info\">#" + (_ladders[format].indexOf(util.slugify(userId)) + 1) + "</span></h2><p>"
             : "<h2>" + trainerNameWithSpaces + "</h2><p>";
         let elo = element.hasAttribute("title")
             ? element.getAttribute("title").substring(element.getAttribute("title").indexOf("Rating: ") + 8)
@@ -688,7 +688,7 @@
                     }
                 }
                 let isActive = true;
-                if (tooltip != void 0) {
+                if (tooltip != void 0 && !tooltip.classList.contains("tooltip-move")) {
                     const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip, _pokemons);
                     const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
                     isActive = playUtil.getActivePokemonId(trainerElement) === pokemonId;
@@ -799,6 +799,7 @@
         section = document.createElement("p");
         section.className = "section";
         const moveName = tooltip.querySelector("h2").childNodes[0].nodeValue;
+        if (moveName === "Recharge") return;
         const moveButton = Array.from(roomElement.querySelectorAll("button[name=chooseMove]")).find(b => b.childNodes[0].nodeValue === moveName);
         let failureRate = Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
         failureRate = isNaN(failureRate) ? null : failureRate;
@@ -954,13 +955,15 @@
     }
 
     const simulateOdds = function (target, value) {
-        const args = value.split(" ");
+        const args = value.split(" ").map(a => a.toLowerCase());
         const simulationTypes = ["pokemon", "types", "dual types"];
         if (args.length > 2 && args[1] === "dual" && args[2] === "types") args[1] = "dual types";
         const example = "<b>Example:</b> /odds dual types [butterfree, golduck, vulpix] ditto:true";
         if (args.length === 1 || args[1] === "help") {
             playUtil.chatOutput(target, 
-                "Use the command /odds followed by the simulation type, the team between brackets and optionally <i>\"ditto:true.\"</i> and <i>\"simulations:200000.\"</i><br>" + example);
+                "Use the command /odds followed by the simulation type, the team between brackets and optionally <i>\"ditto:true.\"</i> and <i>\"simulations:200000.\"</i><br>" 
+                + "Valid simulation types are: " + simulationTypes.map(st => "<i>\"" + st + "\"</i>").join(", ") + ".<br>"
+                + example);
         }
         else if (!simulationTypes.includes(args[1])) {
             playUtil.chatOutput(target, 
@@ -1022,7 +1025,7 @@
     }
 
     const showMovesets = function (target, value) {
-        const args = value.split(" ");
+        const args = value.split(" ").map(a => a.toLowerCase());
         if (args.length === 1 || args[1] === "help") {
             const example = "<b>Example:</b> /movesets Parasect";
             playUtil.chatOutput(target, "Use the command /movesets followed by the name of the Pokémon.<br>" + example);
@@ -1046,7 +1049,7 @@
     }
 
     const showMoves = function (target, value) {
-        const args = value.split(" ");
+        const args = value.split(" ").map(a => a.toLowerCase());
         if (args.length === 1 || args[1] === "help") {
             const example = "<b>Example:</b> /moves Slowbro";
             playUtil.chatOutput(target, "Use the command /moves followed by the name of the Pokémon.<br>" + example);
@@ -1068,18 +1071,40 @@
         }
     }
 
-    const showWinRate = function (target, isPersonal) {
-        let output = "<b>" + (isPersonal ? "Personal" : "Opponent") + " winrates:</b><hr>";
-        for (const pokemon of _pokemons) {
-            if (_winRates.wins == void 0) _winRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
-            const wins = (isPersonal ? _winRates.wins[pokemon.number] : _winRates.opponentWins[pokemon.number]) ?? 0;
-            const losses = (isPersonal ? _winRates.losses[pokemon.number] : _winRates.opponentLosses[pokemon.number]) ?? 0;
-            if (wins + losses > 0) {
-                const percent = ((wins / (wins + losses)) * 100).toFixed(2) + "%";
+    const showWinRate = function (target, value) {
+        const args = value.split(" ").map(a => a.toLowerCase());
+        const winrateTypes = ["personal", "opponent", "reset"];
+        const example = "<b>Example:</b> /winrates personal";
+        if (args.length === 1 || args[1] === "help") {
+            playUtil.chatOutput(target, 
+                "Use the command /winrates followed by the Pokémon winrate type. /winrates reset will wipe your Pokémon winrate records.<br>" 
+                + "Valid winrate types are: " + winrateTypes.map(st => "<i>\"" + st + "\"</i>").join(", ") + ".<br>"
+                 + example);
+        }
+        else if (!winrateTypes.includes(args[1])) {
+            playUtil.chatOutput(target, 
+                "<span class=\"failure\">Invalid Pokémon winrate type.</span> Valid types are: <i>\"" + winrateTypes.join("\"</i>, <i>\"") + "\"</i>.<br>" + example);
+        }
+        else if (args[1] === "reset") {
+            const newWinrates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+            _winRates = newWinrates;
+            util.saveStorage("winRates", newWinrates);
+            playUtil.chatOutput(target, "<b>Personal and opponent Pokémon winrates reset.</b>", "rooby-chat-info");
+        }
+        else if (args[1] === "personal" || args[1] === "opponent") {
+            const isPersonal = args[1] === "personal";
+            let output = "<b>" + (isPersonal ? "Personal" : "Opponent") + " winrates:</b><hr>";
+            for (const pokemon of _pokemons) {
+                if (_winRates.wins == void 0) _winRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+                const wins = (isPersonal ? _winRates.wins[pokemon.number] : _winRates.opponentWins[pokemon.number]) ?? 0;
+                const losses = (isPersonal ? _winRates.losses[pokemon.number] : _winRates.opponentLosses[pokemon.number]) ?? 0;
+                const percent = wins + losses > 0
+                    ? ((wins / (wins + losses)) * 100).toFixed(2) + "%"
+                    : "N/A";
                 output += pokemon.name + ": " + percent + " (" + (wins + losses) + " matches)<br>";
             }
+            playUtil.chatOutput(target, output, "rooby-chat-info");
         }
-        playUtil.chatOutput(target, output, "rooby-chat-info");
     }
 
     const showRooby = function (target) {
@@ -1087,8 +1112,7 @@
         output += "<b>/odds</b> - Calculate the odds of a Pokémon or type appearing in a random battle. Use /odds help for more info.<br>";
         output += "<b>/movesets</b> - Show all possible movesets for a Pokémon. Use /movesets help for more info.<br>";
         output += "<b>/moves</b> - Show all possible moves for a Pokémon. Use /moves help for more info.<br>";
-        output += "<b>/personalwr</b> - Show your personal winrate with individual Pokémon.<br>";
-        output += "<b>/opponentwr</b> - Show your opponents' winrate with individual Pokémon.<br>";
+        output += "<b>/winrates</b> - Show your winrate with individual Pokémon. Use /winrates help for more info.<br>";
         output += "<b>/export</b> - Export the current battle's teams to the <a href=\"https://calc.pokemonshowdown.com/\" target=\"_new\">Showdown Damage Calculator</a>.<br>";
         output += "<b>/rooby</b> - Show this message.<br>";
         output += "Click the <i class=\"fa fa-cog\"></i> Options button on the top right to change RooBY settings.<br>";
@@ -1379,32 +1403,37 @@
             if (backdropBottom == void 0) {
                 backdropBottom = document.createElement("div");
                 backdropBottom.id = "backdropBottom";
-                roomElement.querySelector(".innerbattle").appendChild(backdropBottom);
+                roomElement.querySelector(".innerbattle").prepend(backdropBottom);
             }
             let backSprite = _settings.sprites["back"] == 1 ? _randomSprites[tab]["back"] : _settings.sprites["back"];
             if (backSprite == 0) backSprite = "gen1-back";
             backdropBottom.classList = [];
-            let isMidGenBackAndOldGenSprite = false;
-            let isOldGenBackAndMidGenSprite = false;
+            const gens = ["other-gen", "mid-gen", "old-gen"];
+            for (const gen of gens) {
+                backdropBottom.classList.remove(gen);
+                backdropBottom.classList.remove(gen + "-backdrop");
+            }
             if (backSprite.startsWith("gen1") || backSprite.startsWith("gen2")) {
                 backdropBottom.classList.add("old-gen");
-                if (backdrop.indexOf("-gen3") !== -1 || backdrop.indexOf("-gen4") !== -1) {
-                    isMidGenBackAndOldGenSprite = true;
-                }
             }
             else if (backSprite.startsWith("gen3") || backSprite.startsWith("gen4")) {
-                if (backdrop.indexOf("-gen1") !== -1 || backdrop.indexOf("-gen2") !== -1) {
-                    isOldGenBackAndMidGenSprite = true;
+                backdropBottom.classList.add("mid-gen");
+            }
+            else if (backSprite.startsWith("digimon") || backSprite.includes("ani") || backSprite.includes("gen5") 
+                || backSprite.includes("afd")) {
+                    backdropBottom.classList.add("other-gen");
+            }
+            if (backdrop.includes("-gen")) {
+                if (backdrop.includes("-gen3") || backdrop.includes("-gen4")) {
+                    backdropBottom.classList.add("mid-gen-backdrop");
+                }
+                else {
+                    backdropBottom.classList.add("old-gen-backdrop");
                 }
             }
-            else if (backSprite.startsWith("digimon") || backSprite.includes("ani") || backSprite.includes("gen5") || backSprite.includes("afd")) {
-                backdropBottom.classList.add("big-gen");
+            else if (backdrop.includes("gen1jpn")) {
+                backdropBottom.classList.add("other-gen-backdrop");
             }
-            if (backdrop.indexOf("-gen") === -1) backdropBottom.classList.add("no-border");
-            if (isMidGenBackAndOldGenSprite) roomElement.querySelector(".backdrop").classList.add("old-gen");
-            else roomElement.querySelector(".backdrop").classList.remove("old-gen");
-            if (isOldGenBackAndMidGenSprite) roomElement.querySelector(".backdrop").classList.add("mid-gen");
-            else roomElement.querySelector(".backdrop").classList.remove("mid-gen");
             const trainers = roomElement.querySelectorAll(".trainer");
             for (const trainer of trainers) {
                 updateIcons(trainer);
@@ -1421,7 +1450,8 @@
             else if (_settings.backdrop == 2) backdrop = _randomDefaultBackdrop[tab];
             buildBackdropBottom(roomElement, tab, backdrop);
             let url = _playUrl + "/" + backdrop;
-            const folders = ["aveontrainer", "coromon", "gen1jpn", "magiscarf", "nauris-amatnieks", "oras", "xy", "xybg"];
+            const folders = [...new Set(consts.backdrops.map(b => b.split("/")[0]))];
+            folders.splice(0, 2);
             for (const folder of folders) {
                 element.classList.remove(folder);
             }

@@ -404,14 +404,14 @@ window.roobyCalc = function() {
 		for (const stat in pokemon.boosts) {
 			calcPokemon.boosts[stat] = pokemon.boosts[stat];
 		}
-		if (pokemon.status.toLowerCase().length !== 0) calcPokemon.status = pokemon.status;
+		if (pokemon.status.toLowerCase().length !== 0) calcPokemon.status = pokemon.status.toLowerCase();
 		const opposingId = (!move.isCrit && !!opponent.transformedId) ? opponent.transformedId : opponent.id;
 		const opposingPokemonStats = getTransformedStats(generation, opponent.id, opponent.level, opponent.transformedId, opponent.transformedLevel);
 		const opposingCalcPokemon = new calc.Pokemon(generation, opposingId, opposingPokemonStats);
 		for (const stat in opponent.boosts) {
 			opposingCalcPokemon.boosts[stat] = opponent.boosts[stat];
 		}
-		if (opponent.status.toLowerCase().length !== 0) opposingCalcPokemon.status = opponent.status;
+		if (opponent.status.toLowerCase().length !== 0) opposingCalcPokemon.status = opponent.status.toLowerCase();
 		move.isCrit = isCrit != void 0 ? isCrit : critRate >= 1;
 		const fieldEffects = { defenderSide: { isReflect: opponent.hasReflect, isLightScreen: opponent.hasLightScreen } };
 		const calculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, fieldEffects);

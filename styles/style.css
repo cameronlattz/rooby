@@ -7,20 +7,6 @@
 .tooltip .zero {
     opacity: 0.5;
 }
-.failure:not(.p0) {
-    color: #f00;
-}
-.message-log .chat.calculator {
-    background-color: lightgray;
-    border: 1px solid gray;
-    padding: 2px;
-}
-small.damage, small.failure {
-    display: block;
-}
-#shinyPercentage {
-    width: unset;
-}
 #tooltipwrapper .tooltip .calculator .damage-container {
     display: flex;
     flex-wrap: wrap;
@@ -35,65 +21,8 @@ small.damage, small.failure {
     font-size: 0.8em;
     align-self: flex-end;
 }
-html body .recovery-failure {
-    color: #c00;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-body .movemenu button.recovery-failure small {
-    font-weight: normal;
-    text-transform: none;
-}
-.self-hit.damage {
-    font-size: 0.8em;
-    font-style: italic;
-}
-#backdropBottom {
-    position: absolute;
-    bottom: -1px;
-    width: 439px;
-    left: 100px;
-    background-color: rgba(255, 255, 255, .5);
-    border-top: 1px solid rgba(215,215,215,.5);
-    display: none;
-}
-#backdropBottom.no-border {
-    height: 64px;
-    display: block;
-}
-div#backdropBottom.old-gen {
-    height: 80px;
-}
-.backdrop.old-gen {
-    margin-top: -40px;
-    transform: scaleY(1.2);
-}
-.backdrop.mid-gen {
-    margin-top: 9px;
-    transform: scaleY(1.06);
-}
-div#backdropBottom.big-gen.no-border {
-    display: none;
-}
-.rightbar, .leftbar {
-    z-index: 1;
-}
-.innerbattle > .message {
-    z-index: 2;
-}
-.rooby-chat-info {
-    border: 1px solid gray;
-    background-color: rgba(0, 0, 0, 0.1);
-    padding: 3px;
-}
 .tooltip .section {
     background-color: transparent;
-}
-.green {
-    color: #070;
-}
-.red {
-    color: #800;
 }
 #tooltipwrapper div.tooltip-trainer {
     width: 200px;
@@ -107,6 +36,50 @@ div#backdropBottom.big-gen.no-border {
 #tooltipwrapper div.tooltip-trainer .section:first-child {
     margin-top: unset;
 }
+.message-log .chat.calculator {
+    background-color: lightgray;
+    border: 1px solid gray;
+    padding: 2px;
+}
+small.damage, small.failure {
+    display: block;
+}
+#shinyPercentage {
+    width: unset;
+}
+html body .recovery-failure {
+    color: #c00;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+body .movemenu button.recovery-failure small {
+    font-weight: normal;
+    text-transform: none;
+}
+.self-hit.damage {
+    font-size: 0.8em;
+    font-style: italic;
+}
+.rightbar, .leftbar {
+    z-index: 1;
+}
+.innerbattle > .message {
+    z-index: 2;
+}
+.rooby-chat-info {
+    border: 1px solid gray;
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 3px;
+}
+.failure:not(.p0) {
+    color: #f00;
+}
+.green {
+    color: #070;
+}
+.red {
+    color: #800;
+}
 .trainer > strong > a {
     color: unset;
     text-decoration: none;
@@ -114,16 +87,80 @@ div#backdropBottom.big-gen.no-border {
 .trainer > strong > a:hover {
     text-decoration: underline;
 }
-.backdrop.mid-gen ~ .leftbar .trainer {
-    transform: translateY(10px);
-}
 .pixelated.hd {
     image-rendering: optimizeQuality;
     transform: unset;
 }
-.backdrop.coromon, .backdrop.oras {
+#backdropBottom {
+    position: absolute;
+    bottom: -1px;
+    width: 439px;
+    height: 64px;
+    left: 100px;
+    background-color: rgba(255, 255, 255, .5);
+    border-top: 1px solid rgba(215,215,215,.5);
+    display: block;
+    z-index: 1;
+}
+div#backdropBottom.other-gen, div#backdropBottom.old-gen-backdrop, div#backdropBottom.mid-gen-backdrop, 
+div#backdropBottom.other-gen-backdrop {
+    display: none;
+}
+.backdrop ~ div[role="complementary"]:empty {
+    visibility: hidden;
+}
+#backdropBottom ~ .backdrop ~ div[role="complementary"] {
+    visibility: visible;
+}
+#backdropBottom ~ .backdrop ~ div[role="complementary"] .teamicons:empty {
+    display: none;
+}
+#backdropBottom ~ .backdrop ~ div[role="complementary"] .trainer-near {
+    bottom: 100px;
+}
+#backdropBottom.old-gen {
+    height: 80px;
+}
+#backdropBottom:not(.old-gen-backdrop):not(.mid-gen-backdrop):not(.old-gen):not(.mid-gen) ~ div[role="complementary"],
+#backdropBottom.other-gen-backdrop ~ div[role="complementary"] {
+    background-color: transparent;
+    border: 0;
+}
+#backdropBottom:not(.old-gen-backdrop):not(.mid-gen-backdrop):not(.old-gen):not(.mid-gen) ~ div[role="complementary"] .trainer,
+#backdropBottom.other-gen-backdrop ~ div[role="complementary"] .trainer {
+    background-color: rgba(255, 255, 255, .7);
+    border: 1px solid rgba(215, 215, 215, .7);
+    padding-top: 15px;
+    padding-bottom: 15px;
+    bottom: 85px;
+}
+#backdropBottom:not(.old-gen-backdrop):not(.mid-gen-backdrop):not(.old-gen):not(.mid-gen) ~ div[role="complementary"] .trainer-far,
+#backdropBottom.other-gen-backdrop ~ div[role="complementary"] .trainer-far {
+    top: 0;
+    bottom: unset;
+}
+#backdropBottom.mid-gen-backdrop.old-gen ~ .backdrop ~ div:not([class]) > div:last-child > img  {
+    margin-top: 13px;
+}
+#backdropBottom.mid-gen.old-gen-backdrop ~ .backdrop {
+    margin-top: 9px;
+    transform: scaleY(1.06);
+}
+#backdropBottom.mid-gen.old-gen-backdrop ~ .backdrop ~ .leftbar .trainer {
+    transform: translateY(10px);
+}
+.backdrop.coromon, .backdrop.oras, .backdrop.aveontrainer, .backdrop.nauris-amatnieks {
     background-size: cover;
     background-position-x: center;
+}
+.backdrop.gen1jpn, .backdrop.xy, .backdrop.xybg {
+    background-size: 100%;
+    background-position-x: center;
+}
+.backdrop.carchagui, .backdrop.princess-phoenix {
+    background-size: cover;
+    background-position-x: right;
+    background-position-y: bottom;
 }
 .backdrop.magiscarf {
     background-position-y: bottom;
@@ -131,29 +168,30 @@ div#backdropBottom.big-gen.no-border {
     background-size: 100%;
 }
 .backdrop.aveontrainer {
-    background-size: cover;
     background-position-x: 75%;
     background-position-y: -50px;
 }
 .backdrop.gen1jpn {
-    background-size: 100%;
     transform: scaleY(0.75);
-    top: -47%;
-    left: -4.5%;
+    margin-top: -83px;
+    margin-left: 21px;
+    height: 700px;
+}
+#backdropBottom.mid-gen.other-gen-backdrop ~ .backdrop ~ div:not([class]) > div:last-child > img {
+    margin-top: -16px;
+}
+.backdrop.gen1jpn {
+    transform: scaleY(0.75);
+    margin-top: -83px;
+    margin-left: 21px;
     height: 700px;
 }
 .backdrop.xy {
-    background-size: 100%;
     background-position-y: 30px;
-    background-position-x: center;
 }
 .backdrop.xybg {
-    background-size: 100%;
-    background-position-y: 55px;
-    background-position-x: center;
+    background-position-y: center;
 }
 .backdrop.nauris-amatnieks {
-    background-size: cover;
-    background-position-x: center;
     background-position-y: -75px;
 }
