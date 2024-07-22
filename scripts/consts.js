@@ -97,15 +97,55 @@ const consts = function() {
 		"sprites/gen6bgs/bg-orasdesert.jpg",
 		"sprites/gen6bgs/bg-orassea.jpg",
 		"sprites/gen6bgs/bg-skypillar.jpg",
+		"aveontrainer/bamboo.png",
+		"aveontrainer/beach.png",
+		"aveontrainer/desert.png",
+		"aveontrainer/dive.png",
+		"aveontrainer/forest.png",
+		"aveontrainer/graveyard.png",
+		"aveontrainer/route.png",
+		"aveontrainer/safari.png",
+		"aveontrainer/snow.png",
 		"coromon/AmishTown.gif",
-		"coromon/BloodCave.png",
 		"coromon/ElectricCave.gif",
 		"coromon/ElectricTownBattleScreen.gif",
 		"coromon/PowerTower.png",
 		"coromon/StarterRouteBattleScreen.png",
 		"coromon/StarterTown.png",
 		"coromon/WaterTownBattleScreen.gif",
-		"nauris-amatnieks/plainscastle.jpg"
+		"gen1jpn/red.png",
+		"gen1jpn/blue.png",
+		"gen1jpn/green.png",
+		"magiscarf/factory.png",
+		"nauris-amatnieks/plainscastle.jpg",
+		"oras/4.png",
+		"oras/9.png",
+		"oras/15.png",
+		"oras/24.png",
+		"oras/26.png",
+		"oras/29.png",
+		"oras/30.png",
+		"xy/3.jpg",
+		"xy/5.png",
+		"xy/6.jpg",
+		"xy/8.png",
+		"xy/11.png",
+		"xy/battleMansion.png",
+		"xy/forest.png",
+		"xy/teamFlareHQ.png",
+		"xy/vsClemont.png",
+		"xy/vsGrant.png",
+		"xy/vsLysandra.png",
+		"xy/vsOlympia.png",
+		"xy/vsViola.png",
+		"xy/vsWulfric.png",
+		"xy/wifi.jpg",
+		"xybg/aquacordeEvening.png",
+		"xybg/aquacordeNight.png",
+		"xybg/battlebgChampion.png",
+		"xybg/battlebgField.png",
+		"xybg/battlebgIndoorA.png",
+		"xybg/battlebgMountain.png"
 	];
 
 	const animatedTrainerSprites = ["acetrainer","acetrainerf","alder","artist","backers","backersf","backpackerf","backpacker",
@@ -299,7 +339,10 @@ const consts = function() {
 			front: true,
 			back: true,
 			shiny: true,
-			icons: "gen5"
+			icons: "gen5",
+			shinyTypos: {
+				"aerodactyl": "aerodactyl "
+			}
 		},
 		ani: {
 			extension: "gif",
@@ -338,14 +381,16 @@ const consts = function() {
 			back: "gen1-back",
 			icons: "art",
 			substitute: "gen1",
-			shiny: "gen2spaceworld-shiny"
+			shiny: "gen2spaceworld-shiny",
+			custom: true
 		},
 		gen1artrg: {
 			front: true,
 			back: "gen1-back",
 			icons: "art",
 			substitute: "gen1",
-			shiny: "gen2spaceworld-shiny"
+			shiny: "gen2spaceworld-shiny",
+			custom: true
 		},
 		gen1rgb: {
 			back: true,
@@ -373,7 +418,8 @@ const consts = function() {
 			icons: "pokemon",
 			substitute: "gen1",
 			shiny: true,
-			local: true
+			local: true,
+			custom: true
 		},
 		gen2: {
 			front: true,

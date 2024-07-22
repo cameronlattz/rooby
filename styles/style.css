@@ -121,10 +121,39 @@ div#backdropBottom.big-gen.no-border {
     image-rendering: optimizeQuality;
     transform: unset;
 }
-.backdrop.coromon {
+.backdrop.coromon, .backdrop.oras {
     background-size: cover;
     background-position-x: center;
 }
+.backdrop.magiscarf {
+    background-position-y: bottom;
+    background-position-x: -10px;
+    background-size: 100%;
+}
+.backdrop.aveontrainer {
+    background-size: cover;
+    background-position-x: 75%;
+    background-position-y: -50px;
+}
+.backdrop.gen1jpn {
+    background-size: 100%;
+    transform: scaleY(0.75);
+    top: -47%;
+    left: -4.5%;
+    height: 700px;
+}
+.backdrop.xy {
+    background-size: 100%;
+    background-position-y: 30px;
+    background-position-x: center;
+}
+.backdrop.xybg {
+    background-size: 100%;
+    background-position-y: 55px;
+    background-position-x: center;
+}
 .backdrop.nauris-amatnieks {
+    background-size: cover;
+    background-position-x: center;
     background-position-y: -75px;
 }

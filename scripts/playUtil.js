@@ -36,6 +36,10 @@ const playUtil = function () {
             randomBattleOption.innerHTML = "Random per battle";
             randomBattleOption.value = "1";
             selectOptions.push(randomBattleOption);
+            const randomBattleNoCustomOption = document.createElement("option");
+            randomBattleNoCustomOption.innerHTML = "Random per battle (no customs)";
+            randomBattleNoCustomOption.value = "2";
+            selectOptions.push(randomBattleNoCustomOption);
             for (const optionObject of options) {
                 const option = document.createElement("option");
                 if (typeof optionObject === "string" || optionObject instanceof String) {

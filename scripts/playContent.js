@@ -7,7 +7,9 @@
     let _hiddenDitto = {};
     let _levels = {};
     let _randomSprites = {};
+    let _randomDefaultSprites = {};
     let _randomBackdrop = {};
+    let _randomDefaultBackdrop = {};
     let _settings = JSON.parse(JSON.stringify(consts.defaultSettings));
     let _ratings = [];
     let _ladders = [];
@@ -195,15 +197,28 @@
         let backSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].back === true);
         let iconSprites = [...new Set(spritesSetNames.map(ssn => consts.spriteSets[ssn].icons).flat())];
         let shinySprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].shiny === true);
+        let frontDefaultSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].front === true && consts.spriteSets[ssn].custom !== true);
+        let backDefaultSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].back === true && consts.spriteSets[ssn].custom !== true);
+        let iconDefaultSprites = [...new Set(spritesSetNames.map(ssn => consts.spriteSets[ssn].icons && consts.spriteSets[ssn].custom !== true).flat())];
+        let shinyDefaultSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].shiny === true && consts.spriteSets[ssn].custom !== true);
         if (_randomSprites[tab] == void 0) {
-            const randomNumbers = util.randomNumbersGenerator(tab, [frontSprites.length, backSprites.length, iconSprites.length, shinySprites.length, consts.backdrops.length]);
+            const randomNumbers = util.randomNumbersGenerator(tab, [frontSprites.length, backSprites.length, 
+                iconSprites.length, shinySprites.length, frontDefaultSprites.length, backDefaultSprites.length, 
+                iconDefaultSprites.length, shinyDefaultSprites.length, consts.backdrops.length, 68]);
             _randomSprites[tab] = {};
             _randomSprites[tab].front = frontSprites[randomNumbers[0]];
             _randomSprites[tab].back = backSprites[randomNumbers[1]] + "-back";
             _randomSprites[tab].icons = iconSprites[randomNumbers[2]];
             _randomSprites[tab]["back-shiny"] = shinySprites[randomNumbers[3]] + "-back-shiny";
             _randomSprites[tab].shiny = shinySprites[randomNumbers[3]] + "-shiny";
-            _randomBackdrop[tab] = consts.backdrops[randomNumbers[4]];
+            _randomDefaultSprites[tab] = {};
+            _randomDefaultSprites[tab].front = frontDefaultSprites[randomNumbers[4]];
+            _randomDefaultSprites[tab].back = backDefaultSprites[randomNumbers[5]] + "-back";
+            _randomDefaultSprites[tab].icons = iconDefaultSprites[randomNumbers[6]];
+            _randomDefaultSprites[tab]["back-shiny"] = shinyDefaultSprites[randomNumbers[7]] + "-back-shiny";
+            _randomDefaultSprites[tab].shiny = shinyDefaultSprites[randomNumbers[7]] + "-shiny";
+            _randomBackdrop[tab] = consts.backdrops[randomNumbers[8]];
+            _randomDefaultBackdrop[tab] = consts.backdrops[randomNumbers[9]];
         }
         getWinRates();
     }
@@ -541,7 +556,10 @@
         const calculateWinRate = function (ratings, opponentRatings) {
             const eloWinRate = calculateEloWinRate(ratings?.elo, opponentRatings?.elo);
             const glickoWinRate = calculateGlickoWinRate(ratings?.rpr, ratings?.rprd, opponentRatings?.rpr, opponentRatings?.rprd);
-            return isNaN(glickoWinRate) ? eloWinRate : (eloWinRate + glickoWinRate) / 2;
+            const lowestDeviation = Math.min(ratings?.rprd || 0, opponentRatings?.rprd || 0);
+            const eloWeight = (Math.min(lowestDeviation, 125) - 25) / 200;
+            const glickoWeight = 1- eloWeight;
+            return isNaN(glickoWinRate) ? eloWinRate : (eloWinRate * eloWeight) + (glickoWinRate * glickoWeight);
         }
     
         const calculateGlickoWinRate = function (rating, ratingDeviation, opponentRating, opponentRatingDeviation) {
@@ -612,10 +630,10 @@
             const eloGain = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 1);
             if (_ratings[userId].registertime > 0) age = new Date(_ratings[userId].registertime*1000).toLocaleDateString("en-US");
             else age = "Unregistered";
-            gxe = _ratings[userId][format]?.gxe ? _ratings[userId][format].gxe + "%" : "N/A";
+            gxe = _ratings[userId][format]?.gxe ? _ratings[userId][format].gxe + "%" : "50.0%";
             glicko = _ratings[userId][format]?.rpr
                 ? Math.round(_ratings[userId][format].rpr) + " ± " + Math.round(_ratings[userId][format].rprd)
-                : "N/A";
+                : "1500 ± 130";
             const winRate = calculateWinRate(_ratings[userId][format], _ratings[opponentId][format]);
             winProbability = "<span class=\"" + (winRate > .5 ? "green" : "red") + "\">" + (winRate * 100).toFixed(2) + "%</span>";
             eloChange = "<span class=\"green\">+" + Math.round(eloGain)
@@ -1297,7 +1315,7 @@
                     updateIcons(trainer);
                 }
             }
-
+            
             parent.after(playUtil.buildSettingsP("Backdrop", "backdrop", className, consts.backdrops, _settings.backdrop ?? consts.defaultSettings.backdrop, backdropFunction));
             parent.after(playUtil.buildSettingsP("Randoms shiny percentage", "shiny_percentage", className, null, _settings.shinyPercentage ?? consts.defaultSettings.shinyPercentage, randomFunction, 
                 { type: "number", max: 100, min: 0, value: 0, id: "shinyPercentage" }));
@@ -1308,17 +1326,17 @@
                 let title = key === "shiny" ? "Randoms shiny" : util.capitalizeFirstLetter(key);
                 if (key === "icons") {
                     const icons = [...new Set(Object.keys(consts.spriteSets).map(ss => consts.spriteSets[ss].icons).flat())];
-                    options.push({ text: "Match sprites", value: "2" })
+                    options.push({ text: "Match sprites", value: "3" })
                     for (const icon of icons) {
                         if (icon === "pokemon") continue;
                         options.push({ text: icon, value: icon });
                     }
                 }
                 else if (key === "shiny") {
-                    options.push({ text: "Match sprites", value: "2" })
-                    const backAndFrontSets = util.filterObject(consts.spriteSets, ss => ss["front"] != void 0 && ss["back"] != void 0);
+                    options.push({ text: "Match sprites", value: "3" })
+                    const backAndFrontSets = util.filterObject(consts.spriteSets, ss => ss["shiny"] == true);
                     for (const spriteSet in backAndFrontSets) {
-                        options.push({ text: backAndFrontSets[spriteSet].text ?? spriteSet, value: spriteSet });
+                        options.push({ text: backAndFrontSets[spriteSet].text ?? spriteSet + "-shiny", value: spriteSet + "-shiny" });
                     }
                 }
                 else {
@@ -1400,17 +1418,19 @@
             if (_randomSprites[tab] == void 0) initializeTab(tab);
             if (!_settings.backdrop || _settings.backdrop == 0) backdrop = "fx/bg-gen1.png";
             else if (_settings.backdrop == 1) backdrop = _randomBackdrop[tab];
+            else if (_settings.backdrop == 2) backdrop = _randomDefaultBackdrop[tab];
             buildBackdropBottom(roomElement, tab, backdrop);
             let url = _playUrl + "/" + backdrop;
-            if (backdrop.indexOf("coromon") !== -1 || backdrop.indexOf("nauris-amatnieks") !== -1) {
-                url = chrome.runtime.getURL("images/backdrops/" + backdrop);
-                element.classList.add("coromon");
-                if (backdrop.indexOf("nauris-amatnieks") !== -1) element.classList.add("nauris-amatnieks");
-                else element.classList.remove("nauris-amatnieks");
+            const folders = ["aveontrainer", "coromon", "gen1jpn", "magiscarf", "nauris-amatnieks", "oras", "xy", "xybg"];
+            for (const folder of folders) {
+                element.classList.remove(folder);
             }
-            else {
-                element.classList.remove("coromon");
-                element.classList.remove("nauris-amatnieks");
+            if (!backdrop.startsWith("fx/") && !backdrop.startsWith("sprites/")) {
+                const classes = backdrop.split("/");
+                for (let i = 0; i < classes.length - 1; i++) {
+                    element.classList.add(classes[i]);
+                }
+                url = chrome.runtime.getURL("images/backdrops/" + backdrop);
             }
             element.style = "background-image: url('" + url + "'); display: block; opacity: 0.8;";
         }
@@ -1424,15 +1444,20 @@
         if (tab == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
         if (_randomSprites[tab] == void 0) initializeTab(tab);
         else if (iconsPrefix == 1) iconsPrefix = _randomSprites[tab].icons;
-        else if (iconsPrefix == 2) {
+        else if (iconsPrefix == 2) iconsPrefix = _randomDefaultSprites[tab].icons;
+        else if (iconsPrefix == 3) {
             if (trainer.classList.contains("trainer-near")) {
-                let backSetting = _settings.sprites.back == 1 ? _randomSprites[tab].back : _settings.sprites.back;
+                let backSetting = _settings.sprites.back;
+                if (_settings.sprites.back == 1) backSetting = _randomSprites[tab].back;
+                if (_settings.sprites.back == 2) backSetting = _randomDefaultSprites[tab].back;
                 if (backSetting == void 0) return;
                 if (backSetting == 0) backSetting = "gen1-back";
                 iconsPrefix = consts.spriteSets[backSetting.substring(0, backSetting.length - 5)].icons;
             }
             else if (trainer.classList.contains("trainer-far")) {
-                let frontSetting = _settings.sprites.front == 1 ? _randomSprites[tab].front : _settings.sprites.front;
+                let frontSetting = _settings.sprites.front;
+                if (_settings.sprites.front == 1) frontSetting = _randomSprites[tab].front;
+                if (_settings.sprites.front == 2) frontSetting = _randomDefaultSprites[tab].front;
                 if (frontSetting == void 0) return;
                 if (frontSetting == 0) frontSetting = "gen1";
                 iconsPrefix = consts.spriteSets[frontSetting].icons;
@@ -1448,7 +1473,7 @@
                 if (backgroundSrc.indexOf("pokeball") !== -1) src += _playUrl + "/sprites/digimon/sprites/xy" + srcEnd;
                 else src += chrome.runtime.getURL("images/digimon" + srcEnd);
             }
-            else if (iconsPrefix === "art" && backgroundSrc.indexOf("pokeball") !== -1) src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
+            else if (iconsPrefix === "art") src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
             else if (iconsPrefix === "gen5") src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
             else src += _playUrl + "/sprites/pokemon" + srcEnd;
             picon.style.background = src;
@@ -1482,6 +1507,7 @@
             let spriteSrc;
             if (_settings.sprites[key] == 0) spriteSrc = "gen1" + (key === "back" ? "-back" : "");
             else if (_settings.sprites[key] == 1) spriteSrc = _randomSprites[tab][key];
+            else if (_settings.sprites[key] == 2) spriteSrc = _randomDefaultSprites[tab][key];
             else spriteSrc = _settings.sprites[key];
             if (spriteSrc == void 0) return;
             const spriteSetName = spriteSrc.indexOf("-") === -1 ? spriteSrc : spriteSrc.substring(0, spriteSrc.indexOf("-"));
@@ -1508,15 +1534,20 @@
                 }
                 const pokemonShinyPrng = util.randomNumbersGenerator(shinyPrngName, [100])[0];
                 const shinyPercentage = Number.parseInt(_settings.shinyPercentage) || 0;
+                const spritesObj = _settings.sprites[key] == 1 ? _randomSprites[tab] : _randomDefaultSprites[tab];
                 if (pokemonShinyPrng < shinyPercentage && shinyPercentage !== 0) {
-                    if (_settings.sprites["shiny"] == 0) {
-                        spriteSrc = key === "back" ? _randomSprites[tab]["back-shiny"] : _randomSprites[tab]["shiny"];
+                    // if (_settings.sprites["shiny"] == 0) {
+                    //     spriteSrc = key === "back" ? spritesObj["back-shiny"] : spritesObj["shiny"];
+                    // }
+                    if (_settings.sprites["shiny"] == 1 || _settings.sprites["shiny"] == 2) {
+                        spriteSrc = spritesObj[key === "back" ? "back-shiny" : "shiny"];
                     }
-                    else if (_settings.sprites["shiny"] == 2) {
+                    else if (_settings.sprites["shiny"] == 3) {
                         let matchingSpriteSetKey = _settings.sprites[key];
                         if (matchingSpriteSetKey == 0) matchingSpriteSetKey = "gen1";
-                        else if (matchingSpriteSetKey == 1) {
-                            const randomKey = _randomSprites[tab][key].replace("-back", "");
+                        else if (matchingSpriteSetKey == 1 || matchingSpriteSetKey == 2) {
+                            const matchingSpriteSet = matchingSpriteSetKey == 1 ? _randomSprites[tab] : _randomDefaultSprites[tab];
+                            const randomKey = matchingSpriteSet[key].replace("-back", "");
                             const randomSet = consts.spriteSets[randomKey];
                             matchingSpriteSetKey = randomSet.shiny === true ? randomKey : randomSet.shiny.replace("-shiny", "");
                         }
@@ -1532,7 +1563,7 @@
                         }
                     }
                     else {
-                        spriteSrc = key === "back" ? (_settings.sprites["back-shiny"] + "-back") : _settings.sprites["shiny"];
+                        spriteSrc = _settings.sprites[key === "back" ? "back-shiny" : "shiny"];
                     }
                 }
 
@@ -1544,7 +1575,12 @@
                     const replaceSpace = key === "back" && pokemonId.indexOf("nidoran") !== -1;
                     typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, replaceSpace, typos)
                 }
-                if (spriteSrc.indexOf("spaceworld") !== -1 || spriteSrc.indexOf("art") !== -1) {
+                else if (spriteSrc.indexOf("afd-shiny") !== -1 || spriteSrc.indexOf("afd-back-shiny") !== -1) {
+                    const typos = consts.spriteSets[spriteSetName].shinyTypos;
+                    typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, false, typos)
+                    urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
+                }
+                else if (spriteSrc.indexOf("spaceworld") !== -1 || spriteSrc.indexOf("gen1art") !== -1) {
                     urlEnd = chrome.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
                     urlStart = "";
                     spriteSrc = "";
@@ -1562,7 +1598,7 @@
             }
             setTimeout(function () {  scaleFunc(element); }, 0);
             element.onload = function () { scaleFunc(element); }
-            if (urlEnd.indexOf("art") !== -1) {
+            if (urlEnd.indexOf("gen1art") !== -1) {
                 element.classList.add("hd");
                 element.classList.remove("pixelated");
             }
