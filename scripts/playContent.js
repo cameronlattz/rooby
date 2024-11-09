@@ -1610,7 +1610,7 @@
                     typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, false, typos)
                     urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
                 }
-                else if (spriteSrc.indexOf("spaceworld") !== -1 || spriteSrc.indexOf("gen1art") !== -1) {
+                else if (consts.spriteSets[spriteSetName].custom === true) {
                     urlEnd = chrome.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
                     urlStart = "";
                     spriteSrc = "";

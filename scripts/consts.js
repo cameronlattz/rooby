@@ -3,9 +3,8 @@ const consts = function() {
 		sprites: {
 			front: "0",
 			back: "0",
-			icons: "2",
-			shiny: "2",
-			"back-shiny": "2"
+			icons: "3",
+			shiny: "3"
 		},
 		backdrop: "0",
 		shinyPercentage: 0,
@@ -354,6 +353,13 @@ const consts = function() {
 			shinyTypos: {
 				"aerodactyl": "aerodactyl "
 			}
+		},
+		afd2020: {
+			front: true,
+			back: true,
+			shiny: true,
+			icons: "gen5",
+			custom: true
 		},
 		ani: {
 			extension: "gif",
