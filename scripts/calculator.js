@@ -1,5 +1,6 @@
 window.roobyCalc = function() {
 	"use strict";
+	const api = chrome || browser;
 	const calculateDistribution = function(pokemon) {
 	// originally created by popotheslope
 		class Tree {
@@ -303,9 +304,9 @@ window.roobyCalc = function() {
 		const opponentRevealedPokemon = opponentRevealedPokemonNames.map(name => pokemons.find(p => p.name === name || p.id === name));
 		const opponentPokemonNumbers = opponentRevealedPokemon.map(p => p.number);
 		const args = {pokemons, currentTeamNumbers, opponentPokemonNumbers, opponentHasDitto};
-		chrome.runtime.sendMessage({function:"calculate", args: args}, function(result) {
+		api.runtime.sendMessage({function:"calculate", args: args}, function(result) {
 			returnFunction(tab, trainer, result);
-			void chrome.runtime.lastError;
+			void api.runtime.lastError;
 		});
 	}
 

@@ -1,6 +1,7 @@
 (function() {
     "use strict";
-    const {onMessage} = chrome.runtime, {addListener} = onMessage; 
+    const api = chrome || browser;
+    const {onMessage} = api.runtime, {addListener} = onMessage; 
     onMessage.addListener = fn => addListener.call(onMessage, (msg, sender, respond) => {
         const res = fn(msg, sender, respond);
         if (res instanceof Promise) return !!res.then(respond, void 0);
@@ -56,7 +57,7 @@
     let _spammableWeaknessesByPokemon = {};
     let _dittoNumber;
 
-    const consts = chrome.extension.consts;
+    const consts = api.extension.consts;
 
     const init = async function(pokemons) {
         const saved = saveStorage("pokemons", pokemons);
@@ -101,7 +102,7 @@
     }
 
     const getStorage = async (storageKey, key) => {
-        let result = await chrome.storage.local.get([storageKey]);
+        let result = await api.storage.local.get([storageKey]);
         if (key == void 0) result = result[storageKey];
         else if (result[storageKey] != void 0) result = result[storageKey][key];
         return result;
@@ -117,7 +118,7 @@
             if (storageValues == void 0) storageValues = {};
             storageValues[arg1] = arg2;
         }
-        await chrome.storage.local.set({[storageKey]: storageValues});
+        await api.storage.local.set({[storageKey]: storageValues});
     }
 
     const pruneOddsStorage = async function(saveMonNumbers) {
@@ -138,7 +139,7 @@
         for (const monNumbers of deleteMonNumbers) {
             delete _odds[monNumbers];
         }
-        await chrome.storage.local.set({"odds": newStoredOdds});
+        await api.storage.local.set({"odds": newStoredOdds});
         return true;
     }
 
@@ -155,7 +156,7 @@
     }
 
     const saveStoredOdds = async function(monNumbers, odds) {
-        const allOdds = await chrome.storage.local.get(["odds"]);
+        const allOdds = await api.storage.local.get(["odds"]);
         if (allOdds == void 0) {
             return;
         }

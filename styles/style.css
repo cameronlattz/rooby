@@ -36,6 +36,9 @@
 #tooltipwrapper div.tooltip-trainer .section:first-child {
     margin-top: unset;
 }
+#tooltipwrapper .unrevealed-pokemon small {
+    float: right;
+}
 .message-log .chat.calculator {
     background-color: lightgray;
     border: 1px solid gray;

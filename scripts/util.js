@@ -1,4 +1,5 @@
 window.util = function() {
+	const api = chrome || browser;
 	const BattleTooltips = function() {
 		function BattleTooltips(battle) {
 			const _this = this;
@@ -68,7 +69,7 @@ window.util = function() {
 			this.placeTooltip(html, elem, true, type, dataAttributes);
 			return true;
 		};
-		_proto.placeTooltip = function placeTooltip(innerHTML, hoveredElem, notRelativeToParent, type, dataAttributes) {
+		_proto.placeTooltip = function placeTooltip(htmlElement, hoveredElem, notRelativeToParent, type, dataAttributes) {
 			let elem;
 			if (hoveredElem) {
 				elem = hoveredElem;
@@ -103,9 +104,15 @@ window.util = function() {
 			}
 			wrapper.style.left = x + "px";
 			wrapper.style.top = y + "px";
-			if (innerHTML != void 0) {
-				innerHTML = "<div class=\"tooltipinner\"><div class=\"tooltip tooltip-" + type + "\">" + innerHTML + "</div></div>";
-				wrapper.innerHTML = innerHTML;
+			if (htmlElement != void 0) {
+				const tooltipInnerDiv = document.createElement('div');
+				tooltipInnerDiv.className = 'tooltipinner';
+				const tooltipDiv = document.createElement('div');
+				tooltipDiv.className = 'tooltip tooltip-' + type;
+				tooltipDiv.appendChild(htmlElement);
+				tooltipInnerDiv.appendChild(tooltipDiv);
+				wrapper.textContent = '';
+				wrapper.appendChild(tooltipInnerDiv);
 			}
 			document.body.appendChild(wrapper);
 			BattleTooltips.elem = wrapper.querySelector(".tooltip");
@@ -272,8 +279,8 @@ window.util = function() {
 				saveMonNumbers.push(revealedPokemonNumbers);
 			}
 		}
-		chrome.runtime.sendMessage({function:"prune", args: {saveMonNumbers, pokemons}});
-		void chrome.runtime.lastError;
+		api.runtime.sendMessage({function:"prune", args: {saveMonNumbers, pokemons}});
+		void api.runtime.lastError;
 	}
 
 	const debounce = function(func, delay, timeoutId, ...args) {
@@ -286,7 +293,7 @@ window.util = function() {
 	}
 
 	const getStorage = async function(key) {
-		const result = await chrome.storage.local.get(key);
+		const result = await api.storage.local.get(key);
 		if (result == void 0 && key === "settings") return consts.defaultSettings;
 		return key != null ? result[key] : result;
 	}
@@ -301,7 +308,7 @@ window.util = function() {
 			storage[subkey] = value;
 		}
 		else storage[key] = value;
-		await chrome.storage.local.set({ [key]: storage });
+		await api.storage.local.set({ [key]: storage });
 	}
 
 	const slugify = function(str) {

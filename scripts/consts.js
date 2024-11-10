@@ -4151,4 +4151,5 @@ const consts = function() {
 	}
 }();
 
-if (chrome.extension) chrome.extension.consts = consts;
+const api = chrome || browser;
+if (api.extension) api.extension.consts = consts;

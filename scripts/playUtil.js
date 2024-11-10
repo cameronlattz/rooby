@@ -90,7 +90,8 @@ const playUtil = function () {
         if (!consts.animatedTrainerSprites.includes(trainerName)) return;
         let url = "https://play.pokemonshowdown.com/sprites/trainers/" + trainerName + ".png";
         if (animateTrainer) {
-            url = chrome.runtime.getURL("images/sprites/trainers/" + trainerName + ".png");
+            const api = chrome || browser;
+            url = api.runtime.getURL("images/sprites/trainers/" + trainerName + ".png");
         }
         img.setAttribute(attribute, prefix + url + postfix);
     }

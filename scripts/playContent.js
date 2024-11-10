@@ -1,5 +1,6 @@
 (function () {
     "use strict";
+    const api = chrome || browser;
     let _pokemons = [];
     let _initialTypeOdds = {};
     let _unrevealedPokemonOdds = {};
@@ -21,7 +22,7 @@
     const _doc = document;
 
     (function () {
-        _doc.addEventListener("mouseover", (event) => {
+        const mouseoverfunc = function (event) {
             const element = event.target;
             const roomElement = _page === "play" ? event.target.closest(_playRoomSelector) : document.querySelector(".battle").parentElement;
             if (roomElement == void 0) return;
@@ -45,7 +46,9 @@
                     showTooltip(element, tooltipWrapper.querySelector(".tooltipinner"), false);
                 }
             }
-        });
+        }
+        _doc.addEventListener("mouseover", mouseoverfunc);
+        _doc.addEventListener("touchstart", function(event) { setTimeout(function() { mouseoverfunc(event); }, 0); });
 
         const observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
@@ -82,9 +85,9 @@
                 consts.dualTypesNamesDictionary[dualTypeKey] = dualTypes.indexOf(dualTypeKey);
             };
             if (_page === "play" || _page === "replay") {
-                chrome.runtime.sendMessage({ function: "init", args: { pokemons } }, function (odds) {
+                api.runtime.sendMessage({ function: "init", args: { pokemons } }, function (odds) {
                     _initialTypeOdds = odds;
-                    void chrome.runtime.lastError;
+                    void api.runtime.lastError;
                 });
             }
         });
@@ -97,8 +100,8 @@
                 .map(t => { const rp = playUtil.getRevealedPokemonIds(t); return rp ? rp.length : 0 })
                 .some(l => l >= 3 && l <= 5);
             if (isRoomWithThreeToFiveRevealed) {
-                chrome.runtime.sendMessage({ function: "keepAlive", args: { pokemons: _pokemons } }, function () {
-                    void chrome.runtime.lastError;
+                api.runtime.sendMessage({ function: "keepAlive", args: { pokemons: _pokemons } }, function () {
+                    void api.runtime.lastError;
                 });
             }
         }, 10000);
@@ -498,26 +501,63 @@
             calculateUnrevealedPokemon(trainerElement, roomElement);
         }
         else unrevealedPokemonOdds = _initialTypeOdds;
-        let html = "<h2 class=\"unrevealed-pokemon\">Unrevealed Pokémon:";
+        const container = document.createElement('div');
+        const h2 = document.createElement('h2');
+        h2.className = 'unrevealed-pokemon';
+        h2.textContent = 'Unrevealed Pokémon:';
+        container.appendChild(h2);
+        const p = document.createElement('p');
+
         const sortedTypeKeys = Object.keys(unrevealedPokemonOdds)
             .sort((a, b) => unrevealedPokemonOdds[b] - unrevealedPokemonOdds[a])
             .sort((a, b) => a === "Paralysis" ? -1 : b === "Paralysis" ? 1 : 0)
             .sort((a, b) => a === "Sleep" ? -1 : b === "Sleep" ? 1 : 0);
-        if (Object.keys(unrevealedPokemonOdds).length === 0) html += "</h2><p><span id=\"unrevealedPokemonChecking\">Calculating, check again soon...</span>";
-        else html += " <small>(" + unrevealedPokemonOdds["Total"] + " possible)</small></h2><p>";
+
+        if (Object.keys(unrevealedPokemonOdds).length === 0) {
+            const span = document.createElement('span');
+            span.id = 'unrevealedPokemonChecking';
+            span.textContent = 'Calculating, check again soon...';
+            p.appendChild(span);
+        } else {
+            const small = document.createElement('small');
+            small.textContent = `(${unrevealedPokemonOdds["Total"]} possible)`;
+            h2.appendChild(small);
+        }
+
         for (const typeKey of sortedTypeKeys) {
             if (typeKey === "Total") continue;
-            else if (typeKey === "Sleep") html += "<b class=\"title\">Status inflicters:</b></br>";
-            if (Number.parseFloat((unrevealedPokemonOdds[typeKey] * 100).toFixed(1)) == 0) html += "<span class=\"zero\">";
-            else html += "<span>";
+
+            if (typeKey === "Sleep") {
+                const b = document.createElement('b');
+                b.className = 'title';
+                b.textContent = 'Status inflicters:';
+                p.appendChild(b);
+                p.appendChild(document.createElement('br'));
+            }
+
+            const span = document.createElement('span');
+            if (Number.parseFloat((unrevealedPokemonOdds[typeKey] * 100).toFixed(1)) == 0) {
+                span.className = 'zero';
+            }
+
             const approximate = (unrevealedPokemonOdds[typeKey] > 0 && revealedPokemonIds.length < 5) ? "~" : "";
-            html += "&nbsp;• " + util.capitalizeFirstLetter(typeKey) + ": " + approximate + (unrevealedPokemonOdds[typeKey] * 100).toFixed(1) + "%</br></span>";
-            if (typeKey === "Paralysis") html += "<br><b class=\"title\">Types:</b></br>";
+            span.textContent = ` • ${util.capitalizeFirstLetter(typeKey)}: ${approximate}${(unrevealedPokemonOdds[typeKey] * 100).toFixed(1)}%`;
+            p.appendChild(span);
+            p.appendChild(document.createElement('br'));
+
+            if (typeKey === "Paralysis") {
+                const b = document.createElement('b');
+                b.className = 'title';
+                b.textContent = 'Types:';
+                p.appendChild(b);
+                p.appendChild(document.createElement('br'));
+            }
         }
-        html += "</p>";
+
+        container.appendChild(p);
 
         const tooltip = util.battleTooltips;
-        tooltip.showTooltip(html, element, "unrevealedPokemon", { trainer: trainerName, pokemon: dittoMonNumbers });
+        tooltip.showTooltip(container, element, "unrevealedPokemon", { trainer: trainerName, pokemon: dittoMonNumbers });
         element.removeAttribute("title");
         element.addEventListener("mouseout", function (event) {
             tooltip.hideTooltip(event.target);
@@ -605,56 +645,144 @@
         const format = window.location.pathname.startsWith("/battle")
             ? window.location.pathname.split("-")[1]
             : window.location.pathname.split("-")[0].substring(1);
-        let html = _ladders[format] && _ladders[format].includes(util.slugify(userId))
-            ? "<h2>" + trainerNameWithSpaces + " <span class=\"info\">#" + (_ladders[format].indexOf(util.slugify(userId)) + 1) + "</span></h2><p>"
-            : "<h2>" + trainerNameWithSpaces + "</h2><p>";
+        const container = document.createElement('div');
+
+        const h2 = document.createElement('h2');
+        h2.textContent = trainerNameWithSpaces;
+        if (_ladders[format] && _ladders[format].includes(util.slugify(userId))) {
+            const span = document.createElement('span');
+            span.className = 'info';
+            span.textContent = `#${_ladders[format].indexOf(util.slugify(userId)) + 1}`;
+            h2.appendChild(span);
+        }
+        container.appendChild(h2);
+        
+        const p = document.createElement('p');
+        container.appendChild(p);
+        
         let elo = element.hasAttribute("title")
             ? element.getAttribute("title").substring(element.getAttribute("title").indexOf("Rating: ") + 8)
             : "Loading...";
-        let eloChange = "Loading...";
         let age = "Loading...";
         let gxe = "Loading...";
         let glicko = "Loading...";
-        let winProbability = "Loading...";
         const { wins, draws, losses } = _results[userId] ?? { wins: 0, draws: 0, losses: 0 };
-        let winLoss = wins + "-" + draws + "-" + losses;
-        if (wins + losses > 0) winLoss += " (" + Math.round(wins / (wins + losses) * 100) + "%)";
+        let winLoss = `${wins}-${draws}-${losses}`;
+        if (wins + losses > 0) winLoss += ` (${Math.round(wins / (wins + losses) * 100)}%)`;
+        
         const roomElement = playUtil.getParentRoomElement(element, _page);
+        const winProbabilityValueSpan = document.createElement('span');
+        const eloChangeValueSpan = document.createElement('span');
+        winProbabilityValueSpan.textContent = "Loading...";
         if (_ratings[userId]) {
             const isRight = playUtil.getIsRightByChildElement(element);
             const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
-            const opponentId = playUtil.getTrainerNameByElement(opponentTrainerElement).replace(/\s/g,'').toLowerCase();
+            const opponentId = playUtil.getTrainerNameByElement(opponentTrainerElement).replace(/\s/g, '').toLowerCase();
             if (elo === "Loading..." || _page === "play") elo = _ratings[userId][format]?.elo ? Math.round(_ratings[userId][format].elo) : 1000;
             const eloLoss = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, -1);
             const eloTie = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 0);
             const eloGain = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 1);
-            if (_ratings[userId].registertime > 0) age = new Date(_ratings[userId].registertime*1000).toLocaleDateString("en-US");
+            if (_ratings[userId].registertime > 0) age = new Date(_ratings[userId].registertime * 1000).toLocaleDateString("en-US");
             else age = "Unregistered";
-            gxe = _ratings[userId][format]?.gxe ? _ratings[userId][format].gxe + "%" : "50.0%";
+            gxe = _ratings[userId][format]?.gxe ? `${_ratings[userId][format].gxe}%` : "50.0%";
             glicko = _ratings[userId][format]?.rpr
-                ? Math.round(_ratings[userId][format].rpr) + " ± " + Math.round(_ratings[userId][format].rprd)
+                ? `${Math.round(_ratings[userId][format].rpr)} ± ${Math.round(_ratings[userId][format].rprd)}`
                 : "1500 ± 130";
             const winRate = calculateWinRate(_ratings[userId][format], _ratings[opponentId][format]);
-            winProbability = "<span class=\"" + (winRate > .5 ? "green" : "red") + "\">" + (winRate * 100).toFixed(2) + "%</span>";
-            eloChange = "<span class=\"green\">+" + Math.round(eloGain)
-                + "</span> / " + (eloTie > 0 ? "+" : "") + Math.round(eloTie)
-                + " / <span class=\"red\">" + Math.round(eloLoss) + "</span>";
+            winProbabilityValueSpan.className = winRate > .5 ? "green" : "red";
+            winProbabilityValueSpan.textContent = (winRate * 100).toFixed(2) + "%";
+            eloChangeValueSpan.className = eloGain > 0 ? "green" : eloLoss > 0 ? "red" : "black";
+            const greenSpan = document.createElement('span');
+            greenSpan.className = "green";
+            greenSpan.textContent = "+" + Math.round(eloGain);
+            const tieSpan = document.createElement('span');
+            tieSpan.textContent = (eloTie > 0 ? "+" : "") + Math.round(eloTie);
+            const redSpan = document.createElement('span');
+            redSpan.className = "red";
+            redSpan.textContent = Math.round(eloLoss);
+            eloChangeValueSpan.appendChild(greenSpan);
+            eloChangeValueSpan.appendChild(document.createTextNode(" / "));
+            eloChangeValueSpan.appendChild(tieSpan);
+            eloChangeValueSpan.appendChild(document.createTextNode(" / "));
+            eloChangeValueSpan.appendChild(redSpan);
         }
-        html += "<span class=\"section\">Registered:<span class=\"info\">" + age + "</span></span>"
-            + "<span class=\"section\">Elo:<span class=\"info\"><b>" + elo + "</b></span><br>"
-            + "GXE:<span class=\"info\">" + gxe + "</span><br>"
-            + "Glicko-1:<span class=\"info\">" + glicko + "</span></span>";
-        html += "<span class=\"section\">Win probability:<span class=\"info\">" + winProbability + "</span><br>";
+        
+        const registeredSpan = document.createElement('span');
+        registeredSpan.className = 'section';
+        registeredSpan.textContent = 'Registered:';
+        const registeredInfoSpan = document.createElement('span');
+        registeredInfoSpan.className = 'info';
+        registeredInfoSpan.textContent = age;
+        registeredSpan.appendChild(registeredInfoSpan);
+        p.appendChild(registeredSpan);
+        
+        const eloSpan = document.createElement('span');
+        eloSpan.className = 'section';
+        const eloTitle = document.createElement('span');
+        eloTitle.textContent = 'Elo:';
+        const eloInfoSpan = document.createElement('span');
+        eloInfoSpan.className = 'info';
+        const eloBold = document.createElement('b');
+        eloBold.textContent = elo;
+        eloInfoSpan.appendChild(eloBold);
+        eloSpan.appendChild(eloTitle);
+        eloSpan.appendChild(eloInfoSpan);
+        eloSpan.appendChild(document.createElement('br'));
+        
+        const gxeTitleSpan = document.createElement('span');
+        gxeTitleSpan.textContent = 'GXE:';
+        const gxeInfoSpan = document.createElement('span');
+        gxeInfoSpan.className = 'info';
+        gxeInfoSpan.textContent = gxe;
+        eloSpan.appendChild(gxeTitleSpan);
+        eloSpan.appendChild(gxeInfoSpan);
+        eloSpan.appendChild(document.createElement('br'));
+
+        const glickoTitleSpan = document.createElement('span');
+        glickoTitleSpan.textContent = 'Glicko-1:';
+        const glickoInfoSpan = document.createElement('span');
+        glickoInfoSpan.className = 'info';
+        glickoInfoSpan.textContent = glicko;
+        eloSpan.appendChild(glickoTitleSpan);
+        eloSpan.appendChild(glickoInfoSpan);
+        eloSpan.appendChild(document.createElement('br'));
+
+        p.appendChild(eloSpan);
+        
+        const winProbabilitySpan = document.createElement('span');
+        winProbabilitySpan.className = 'section';
+        const winProbabilityTitleSpan = document.createElement('span');
+        winProbabilityTitleSpan.textContent = 'Win probability:';
+        winProbabilityValueSpan.classList.add("info");
+        winProbabilitySpan.appendChild(winProbabilityTitleSpan);
+        winProbabilitySpan.appendChild(winProbabilityValueSpan);
+        winProbabilitySpan.appendChild(document.createElement('br'));
+        
         if (roomElement.querySelector(".rated")) {
-            html += "Elo change:<span class=\"info\">" + eloChange + "</span></span>";
+            const eloChangeTitleSpan = document.createElement('span');
+            eloChangeTitleSpan.textContent = 'Elo change:';
+            eloChangeValueSpan.className = 'info';
+            winProbabilitySpan.appendChild(eloChangeTitleSpan);
+            winProbabilitySpan.appendChild(eloChangeValueSpan);
         }
+
+        p.appendChild(winProbabilitySpan);
+        
         if (document.querySelector(".usernametext")) {
-            const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
-            if (loggedInName !== userId) html += "<span class=\"section\">Personal record:<span class=\"info\">" + winLoss + "</span></span>";
+            const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g, '').toLowerCase();
+            if (loggedInName !== userId) {
+                const personalRecordSpan = document.createElement('span');
+                personalRecordSpan.className = 'section';
+                personalRecordSpan.textContent = 'Personal record:';
+                const personalRecordInfoSpan = document.createElement('span');
+                personalRecordInfoSpan.className = 'info';
+                personalRecordInfoSpan.textContent = winLoss;
+                personalRecordSpan.appendChild(personalRecordInfoSpan);
+                p.appendChild(personalRecordSpan);
+            }
         }
-        html += "</p>";
         const tooltip = util.battleTooltips;
-        tooltip.showTooltip(html, element, "trainer", { trainer: userId });
+        tooltip.showTooltip(container, element, "trainer", { trainer: userId });
         const title = element.getAttribute("title");
         element.removeAttribute("title");
         element.addEventListener("mouseout", function (event) {
@@ -838,7 +966,7 @@
     }
 
     const showPokemonTooltip = function (section, tooltip, roomElement, isRight, tooltipPokemon) {
-
+                
         const showRecoverFailureRate = function (revealedMoveElement, failureRate) {
             if (failureRate != void 0 && _settings.miscCalculator !== false) {
                 const recoverSpan = document.createElement("span");
@@ -1001,7 +1129,7 @@
                 if (key === "Paralysis") output += "<br>";
                 return output;
             }
-            chrome.runtime.sendMessage({ function: "simulate", args: { type, currentTeamNumbers, isDitto, pokemons, simulations } }, function (result) {
+            api.runtime.sendMessage({ function: "simulate", args: { type, currentTeamNumbers, isDitto, pokemons, simulations } }, function (result) {
                 let output = Object.keys(result.odds)
                     .map(o => [o, result.odds[o]])
                     .filter(o => type === "pokemon" ? o[1] > 0 : true)
@@ -1019,7 +1147,7 @@
                     + (result.simulations != void 0 ? " (" + result.simulations + " simulations)" : "")
                     + ":</b><hr>" + output;
                 playUtil.chatOutput(target, output, "rooby-chat-info");
-                void chrome.runtime.lastError;
+                void api.runtime.lastError;
             });
         }
     }
@@ -1245,7 +1373,7 @@
                 for (const randomType of randomTypes) {
                     const button = document.createElement("button");
                     button.setAttribute("id", "randomAvatarButton");
-                    button.setAttribute("style", "background-image: url(" + chrome.runtime.getURL("images/sprites/trainers/" + randomType + ".png") + ");")
+                    button.setAttribute("style", "background-image: url(" + api.runtime.getURL("images/sprites/trainers/" + randomType + ".png") + ");")
                     button.classList.add("option", "pixelated", "custom");
                     const animated = randomType === "randomAnimatedTrainer" ? "animated" : "";
                     button.setAttribute("title", "Random " + animated + " per battle");
@@ -1460,7 +1588,7 @@
                 for (let i = 0; i < classes.length - 1; i++) {
                     element.classList.add(classes[i]);
                 }
-                url = chrome.runtime.getURL("images/backdrops/" + backdrop);
+                url = api.runtime.getURL("images/backdrops/" + backdrop);
             }
             element.style = "background-image: url('" + url + "'); display: block; opacity: 0.8;";
         }
@@ -1501,10 +1629,10 @@
             let src = srcStart.substring(0, srcStart.indexOf("\"") + 1);
             if (iconsPrefix.indexOf("digimon") !== -1) {
                 if (backgroundSrc.indexOf("pokeball") !== -1) src += _playUrl + "/sprites/digimon/sprites/xy" + srcEnd;
-                else src += chrome.runtime.getURL("images/digimon" + srcEnd);
+                else src += api.runtime.getURL("images/digimon" + srcEnd);
             }
-            else if (iconsPrefix === "art") src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
-            else if (iconsPrefix === "gen5") src += chrome.runtime.getURL("images/" + iconsPrefix + srcEnd);
+            else if (iconsPrefix === "art") src += api.runtime.getURL("images/" + iconsPrefix + srcEnd);
+            else if (iconsPrefix === "gen5") src += api.runtime.getURL("images/" + iconsPrefix + srcEnd);
             else src += _playUrl + "/sprites/pokemon" + srcEnd;
             picon.style.background = src;
         }
@@ -1611,7 +1739,7 @@
                     urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
                 }
                 else if (consts.spriteSets[spriteSetName].custom === true) {
-                    urlEnd = chrome.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
+                    urlEnd = api.runtime.getURL("images/sprites/" + spriteSrc + "/" + pokemonId + ".png");
                     urlStart = "";
                     spriteSrc = "";
                 }
