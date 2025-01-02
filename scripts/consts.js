@@ -1,13 +1,14 @@
 const consts = function() {
 	const defaultSettings = {
 		sprites: {
-			front: "0",
-			back: "0",
+			front: "1",
+			back: "1",
 			icons: "3",
 			shiny: "3"
 		},
-		backdrop: "0",
-		shinyPercentage: 0,
+		backdrop: "1",
+		shinyPercentage: 3,
+		roobyMatchmaking: false,
 		damageCalculator: true,
 		movesetCalculator: true,
 		unrevealedCalculator: true,
@@ -60,8 +61,6 @@ const consts = function() {
 		"fx/bg-route.png",
 		"fx/bg-space.jpg",
 		"fx/bg-spl.png",
-		"fx/client-bg-horizon.jpg",
-		"fx/client-bg-waterfall.jpg",
 		"fx/bg-thunderplains.png",
 		"fx/bg-volcanocave.png",
 		"sprites/gen6bgs/bg-aquacordetown.jpg",

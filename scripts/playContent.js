@@ -16,6 +16,9 @@
     let _ladders = [];
     let _results = {};
     let _winRates = {};
+    let _roobyFormats = {};
+    let _roobyLeaderboards = {};
+    let _roobyLadders = [];
     const _playUrl = consts.urls.gameUrls[0];
     const _playRoomSelector = "div[id^=room-battle-gen1]:not([style*=\"display: none\"]:not([style*=\"display:none\"]";
     const _page = window.location.hostname.split(".")[0];
@@ -25,7 +28,7 @@
         const mouseoverfunc = function (event) {
             const element = event.target;
             const roomElement = _page === "play" ? event.target.closest(_playRoomSelector) : document.querySelector(".battle").parentElement;
-            if (roomElement == void 0) return;
+            if (roomElement == undefined) return;
             if (roomElement.id === "" && _page === "replay") roomElement.id = "room-battle-" + window.location.pathname.substring(1);
             const pokemons = [..._pokemons];
             if (element.getAttribute("title") === "Not revealed" && !!pokemons && _settings.unrevealedCalculator !== false) {
@@ -39,10 +42,10 @@
             }
             const tooltipWrapper = document.querySelector("#tooltipwrapper");
             if (tooltipWrapper) {
-                if (event.target.closest(".rightbar") != void 0 || event.target.getAttribute("data-id") === "p2a") {
+                if (event.target.closest(".rightbar") != undefined || event.target.getAttribute("data-id") === "p2a") {
                     showTooltip(element, tooltipWrapper.querySelector(".tooltipinner"), true);
                 }
-                else if (event.target.closest(".leftbar") != void 0 || event.target.getAttribute("data-id") === "p1a" || event.target.closest(".controls") != void 0) {
+                else if (event.target.closest(".leftbar") != undefined || event.target.getAttribute("data-id") === "p1a" || event.target.closest(".controls") != undefined) {
                     showTooltip(element, tooltipWrapper.querySelector(".tooltipinner"), false);
                 }
             }
@@ -92,6 +95,16 @@
             }
         });
         loadLadderData();
+        loadRoobyLadderData();
+        loadRoobyLeaderboardData();
+        util.getRooBYFormats().then(formats => {
+            _roobyFormats = formats;
+            const roomLadder = document.getElementById("room-ladder");
+            if (roomLadder) {
+                const ladder = roomLadder.querySelector(".ladder");
+                if (ladder) addToLadder(ladder);
+            }
+        });
         setInterval(function () {
             const allRooms = Array.from(document.querySelectorAll(".ps-room")).filter(e => e.id.indexOf("gen1randombattle") !== -1);
             const isRoomWithThreeToFiveRevealed = allRooms
@@ -107,8 +120,11 @@
         }, 10000);
         setInterval(function () {
             util.pruneCalculations([..._pokemons]);
-            loadLadderData();
         }, 300000);
+        setInterval(function () {
+            loadLadderData();
+            loadRoobyLadderData();
+        }, 5000);
         setTimeout(function () {
             util.pruneCalculations([..._pokemons]);
         }, 5000);
@@ -119,7 +135,7 @@
             else if (event.target.parentElement.classList.contains("chatbox") && event.target.tagName === "TEXTAREA") {
                 const value = event.target.getAttribute("data-value");
                 if (!value || value.length === "") return;
-                if (value.startsWith("/odds")) {
+                if (value.startsWith("/unrevealed")) {
                     simulateOdds(event.target, value);
                 }
                 else if (value.startsWith("/movesets")) {
@@ -148,6 +164,7 @@
                 else if (value.startsWith("/rooby")) {
                     showRooby(event.target);
                 }
+                event.target.removeAttribute("data-value");
             }
         });
 
@@ -204,7 +221,7 @@
         let backDefaultSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].back === true && consts.spriteSets[ssn].custom !== true);
         let iconDefaultSprites = [...new Set(spritesSetNames.map(ssn => consts.spriteSets[ssn].icons && consts.spriteSets[ssn].custom !== true).flat())];
         let shinyDefaultSprites = spritesSetNames.filter(ssn => consts.spriteSets[ssn].shiny === true && consts.spriteSets[ssn].custom !== true);
-        if (_randomSprites[tab] == void 0) {
+        if (_randomSprites[tab] == undefined) {
             const randomNumbers = util.randomNumbersGenerator(tab, [frontSprites.length, backSprites.length, 
                 iconSprites.length, shinySprites.length, frontDefaultSprites.length, backDefaultSprites.length, 
                 iconDefaultSprites.length, shinyDefaultSprites.length, consts.backdrops.length, 68]);
@@ -227,18 +244,133 @@
     }
 
     const elementInserted = function (element) {
-        if (element.closest == void 0 || element.classList == void 0) return;
+        if (element.closest == undefined || element.classList == undefined) return;
         if (element.classList.contains("ps-popup")) {
-            settingsPopup(element);
+            if (element.querySelector("p:not([style])").textContent === "Your replay has been uploaded! It's available at:") {
+                const a = element.querySelector("a");
+                const wonChat = document.querySelector("[data-uploading]");
+                if (wonChat) {
+                    wonChat.removeAttribute("data-uploading");
+                    const replayLink = a.href.split(".com/")[1];
+                    const strong = element.querySelector("strong");
+                    const log = wonChat.closest(".message-log");
+                    const small = log.querySelector("small");
+                    if (small.getAttribute("data-rooby")) {
+                        util.reportRooBYLadder("", replayLink, "end");
+                        setTimeout(function () { strong.parentElement.click() }, 0);
+                        const players = {};
+                        const cleanSplit = small.textContent.replace(/\W/g, '').split("and");
+                        const player1Name = cleanSplit[0].replace(/\s/g,'').toLowerCase();
+                        const player2Name = cleanSplit[1].replace("joined", "").replace(/\s/g,'').toLowerCase();
+                        const battleHistories = Array.from(document.querySelectorAll(".battle-history"));
+                        const battleHistory = battleHistories.find(bh => bh.innerHTML.includes(" won the battle!"));
+                        let winnerName = "";
+                        if (battleHistory) {
+                            winnerName = battleHistory.querySelector("strong").textContent.replace(/\s/g,'').toLowerCase();
+                        }
+                        const format = "rooby_crazyhouse";
+                        const rating = "Elo";
+                        const playerNames = [player1Name, player2Name];
+                        for (const name of playerNames) {
+                            players[name] = 1000;
+                            if (_roobyLeaderboards &&_roobyLeaderboards[format] && _roobyLeaderboards[format][name]
+                                && _roobyLeaderboards[format][name][rating]) {
+                                    players[name] = Math.round(_roobyLeaderboards[format][name][rating]);
+                            }
+                        }
+                        for (const name in players) {
+                            const opponentName = player1Name === name ? player2Name : player1Name;
+                            const result = winnerName === name ? 1 : winnerName === opponentName ? -1 : 0;
+                            const isWinner = result === 1;
+                            const change = roobyCalc.Elo(players[name], players[opponentName], result);
+                            const ratingChange = document.createElement("div");
+                            ratingChange.className = "chat";
+                            const rating = players[name];
+                            const textNode1 = document.createTextNode(name + "'s RooBY rating: " + rating + " → ");
+                            const newRatingStrong = document.createElement("strong");
+                            const br = document.createElement("br");
+                            let newRating = rating;
+                            if (result !== 0) newRating = isWinner ? rating + change : rating - change;
+                            newRating = Math.round(Math.max(1000, newRating));
+                            const newChange = Math.round(Math.abs(rating - newRating));
+                            newRatingStrong.textContent = newRating;
+                            let text = "(+" + newChange + " for winning)";
+                            if (result === 0) text = "(" + newChange + " for tie)";
+                            else if (!isWinner) text = "(-" + newChange + " for losing)";
+                            const textNode2 = document.createTextNode(text);
+                            ratingChange.appendChild(textNode1);
+                            ratingChange.appendChild(newRatingStrong);
+                            ratingChange.appendChild(br);
+                            ratingChange.appendChild(textNode2);
+                            log.appendChild(ratingChange);
+                        }
+                    }
+
+                }
+            } else setTimeout(function () { settingsPopup(element); }, 10);
+        }
+        else if (element.classList.contains("formatselect")) {
+            const battleform = element.closest("form.battleform");
+            if (battleform.hasAttribute("data-rooby-name")) {
+                element.textContent = "[Gen 1] " + battleform.getAttribute("data-rooby-name");
+            }
+        }
+        else if (element.classList.contains("ladder")) {
+            addToLadder(element);
+        }
+        else if (element.classList.contains("chat")) {
+            if (element.classList.contains("message-error")) {
+                const commands = [ "unrevealed", "movesets", "moves", "export", "winrates", "rooby"];
+                for (const command of commands) {
+                    if (element.innerText.startsWith("The command \"/" + command)) {
+                        removeChatError(element, command);
+                        break;
+                    }
+                }
+            }
+            else {
+                const small = element.querySelector("small");
+                if (small && small.textContent.endsWith(" joined") && small.textContent.includes("and")) {
+                    const username = document.querySelector(".usernametext");
+                    if (username) {
+                        const loggedInName = username.innerText.replace(/\s/g,'').toLowerCase();
+                        const clean = small.textContent.replace(/\W/g, '');
+                        const p1 = clean.split("and")[0].replace(/\s/g,'').toLowerCase();
+                        const p2 = clean.split("and")[1].split("joined")[0].replace(/\s/g,'').toLowerCase();
+                        const opponent = p1 === loggedInName ? p2 : p1;
+                        const pmWindow = document.querySelector(".pm-window[data-userid='" + opponent + "']");
+                        if (pmWindow == undefined) return;
+                        const lastChat = pmWindow.querySelector("div[role='log']").lastElementChild;
+                        const log = lastChat.querySelector(".message-log");
+                        small.setAttribute("data-rooby", "true");
+                        if (log && lastChat.textContent.includes(" wants to battle!")) {
+                            const a = log.querySelector("a");
+                            if (a == undefined) {
+                                setTimeout(function () {
+                                    const lastChat = pmWindow.querySelector("div[role='log']").lastElementChild;
+                                    const a = lastChat.querySelector("a");
+                                    if (a && lastChat.textContent.includes(" accepted the challenge, starting ")) {
+                                        let input = a.parentElement;
+                                        while (input && input.tagName !== "INPUT") {
+                                            input = input.previousElementSibling;
+                                        }
+                                        if (input) util.reportRooBYLadder(input.value, a.href.split(".com/")[1], "start");
+                                    }
+                                }, 0);
+                            }
+                        }
+                    }
+                }
+            }
         }
         else {
             let roomElement;
             let gametype;
             if (_page === "play") {
                 const currentTab = document.querySelector(".roomtab.cur");
-                if (currentTab == void 0) return;
+                if (currentTab == undefined) return;
                 const tabElement = currentTab.querySelector(".text");
-                if (tabElement == void 0) return;
+                if (tabElement == undefined) return;
                 gametype = tabElement.innerText;
                 roomElement = playUtil.getParentRoomElement(element, _page);
             }
@@ -246,7 +378,7 @@
                 gametype = document.title.split(":")[0];
                 roomElement = playUtil.getParentRoomElement(element, _page);
             }
-            if (roomElement == void 0) return;
+            if (roomElement == undefined) return;
             if (consts.gameTypes.some(gt => gametype.localeCompare("gen1" + gt.replace(/\s/g, ""))) && roomElement) {
                 if (element.classList.contains("trainer")) {
                     updateIcons(element);
@@ -269,6 +401,7 @@
                 else if (element.classList.contains("backdrop")) {
                     updateBackdrop(element);
                     setTimeout(function (elem) { updateBackdrop(elem); }, 0, element);
+                    setTimeout(function (elem) { updateBackdrop(elem); }, 500, element);
                 }
                 else if (element.classList.contains("battle-history") && document.querySelector(".usernametext")) {
                     if (element.innerHTML.indexOf("Battle started between ") !== -1 && _page === "play") {
@@ -281,6 +414,8 @@
                         const rightTrainerElement = playUtil.getTrainerElementBySide(roomElement, true);
                         const rightName = playUtil.getTrainerNameByElement(rightTrainerElement).replace(/\s/g,'').toLowerCase();
                         if (loggedInName === leftName || loggedInName === rightName) {
+                            const firstSmall = element.closest("div[role='log']").querySelector("small");
+                            if (firstSmall.getAttribute("data-rooby") !== "true") return;
                             const winnerName = element.children[0].innerHTML.split(" won the battle!")[0].replace(/\s/g,'').toLowerCase();
                             const opponentName = loggedInName === leftName ? rightName : leftName;
                             const result = loggedInName === winnerName ? 1 : -1;
@@ -290,15 +425,8 @@
                             const pokemons = playUtil.getRevealedPokemonIds(winnerTrainerElement);
                             const opponentPokemons = playUtil.getRevealedPokemonIds(opponentTrainerElement);
                             saveResult(opponentName, tabId, result, pokemons, opponentPokemons);
-                        }
-                    }
-                }
-                else if (element.classList.contains("message-error")) {
-                    const commands = [ "odds", "movesets", "moves", "export", "winrates", "rooby"];
-                    for (const command of commands) {
-                        if (element.innerText.startsWith("The command \"/" + command)) {
-                            removeChatError(element, command);
-                            break;
+                            element.setAttribute("data-uploading", "true");
+                            playUtil.uploadReplay(tabId);
                         }
                     }
                 }
@@ -306,7 +434,7 @@
                     const tab = playUtil.getTabIdByRoomElement(roomElement);
                     const isRight = element.classList.contains("lstatbar");
                     const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
-                    if (trainerElement == void 0) return;
+                    if (trainerElement == undefined) return;
                     const trainerName = playUtil.getTrainerNameByElement(trainerElement);
                     if (isRight) {
                         const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
@@ -316,7 +444,7 @@
                     }
                     if (element.classList.contains("statbar")) {
                         const pokemonId = playUtil.getActivePokemonId(trainerElement);
-                        if (pokemonId == void 0) return;
+                        if (pokemonId == undefined) return;
                         const statElement = playUtil.getStatElementBySide(roomElement, isRight);
                         const pokemonLevel = playUtil.getLevelFromStatElement(statElement);
                         setLevels(pokemonLevel, tab, trainerName, pokemonId);
@@ -339,17 +467,114 @@
     const addUserLink = function (trainerElement) {
         const trainerNameWithSpaces = playUtil.getTrainerNameByElement(trainerElement, false);
         const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
-        trainerElement.querySelector("strong").innerHTML = _settings.trainerTooltip === false
-            ? trainerNameWithSpaces
-            : "<a href=\"https://pokemonshowdown.com/users/" + userId + "\" target=\"_new\">" + trainerNameWithSpaces + "</a>";
+        const userElement = document.createElement(_settings.trainerTooltip === false ? "span" : "a");
+        if (_settings.trainerTooltip !== false) {
+            userElement.href = "https://pokemonshowdown.com/users/" + userId;
+            userElement.target = "_new";
+        }
+        userElement.textContent = trainerNameWithSpaces;
+        trainerElement.querySelector("strong").innerHTML = "";
+        trainerElement.querySelector("strong").appendChild(userElement);
+    }
+
+    const addToLadder = function (ladder) {
+        const formatKeys = Object.keys(_roobyFormats);
+        if (_settings.roobyMatchmaking === false || formatKeys.length === 0) return;
+        const h3s = Array.from(ladder ? ladder.querySelectorAll("h3") : []);
+        const formatH3 = h3s.find(h => formatKeys.some(fk => h.textContent.includes(fk)));
+        if (formatH3) {
+            const formatKey = formatKeys.find(fk => formatH3.textContent.includes(fk));
+            formatH3.textContent = "[Gen 1] " + formatH3.textContent.replace(formatKey, _roobyFormats[formatKey].name);
+            formatH3.nextSibling.remove();
+            const table = document.createElement("table");
+            const tbody = document.createElement("tbody");
+            const headerTr = document.createElement("tr");
+            const blankTh = document.createElement("th");
+            blankTh.textContent = "";
+            headerTr.appendChild(blankTh);
+            const nameTh = document.createElement("th");
+            nameTh.textContent = "Name";
+            headerTr.appendChild(nameTh);
+            const ladders = _roobyLeaderboards[formatKey];
+            const ladderKeys = ladders ? Object.keys(ladders) : ["Rating"];
+            const ratingNames = [];
+            if (ladderKeys.length > 0) {
+                const nameKeys = ladders ? Object.keys(ladders[ladderKeys[0]]) : [];
+                for (const nameKey of nameKeys) {
+                    const eloTh = document.createElement("th");
+                    eloTh.textContent = nameKey;
+                    headerTr.appendChild(eloTh);
+                    ratingNames.push(nameKey);
+                }
+            }
+            tbody.appendChild(headerTr);
+            loadRoobyLeaderboardData();
+            let index = 1;
+            for (const name in ladders) {
+                const ladder = ladders[name];
+                const tr = document.createElement("tr");
+                const tdIndex = document.createElement("td");
+                tdIndex.textContent = index++;
+                tr.appendChild(tdIndex);
+                const tdName = document.createElement("td");
+                tdName.textContent = name;
+                tr.appendChild(tdName);
+                for (const ratingName of ratingNames) {
+                    const tdElo = document.createElement("td");
+                    tdElo.style = "font-weight:bold";
+                    tdElo.textContent = parseInt(ladder[ratingName]);
+                    tr.appendChild(tdElo);
+                }
+                tbody.appendChild(tr);
+            }
+            if (ladders == undefined) {
+                const tr = document.createElement("tr");
+                const td = document.createElement("td");
+                td.colSpan = 3;
+                td.textContent = "No players found.";
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            }
+            table.appendChild(tbody);
+            formatH3.after(table);
+        }
+        else {
+            let ul = document.getElementById("roobyLadder");
+            const ladderExists = ul != undefined;
+            if (!ladderExists && ladder == undefined) return;
+            ul = ul || document.createElement("ul");
+            ul.id = "roobyLadder";
+            ul.style = "list-style:none;margin:0;padding:0";
+            ul.textContent = "";
+            for (const format of formatKeys) {
+                const li = document.createElement("li");
+                li.style = "margin:5px";
+                const button = document.createElement("button");
+                button.name = "selectFormat";
+                button.value = format;
+                button.className = "button";
+                button.style = "width:320px;height:30px;text-align:left;font:12pt Verdana";
+                button.textContent = _roobyFormats[format].name;
+                li.appendChild(button);
+                ul.appendChild(li);
+            }
+            if (!ladderExists) ladder.appendChild(ul);
+            if (!h3s.some(h => h.textContent === "RooBY Mods")) {
+                const h3 = document.createElement("h3");
+                h3.textContent = "RooBY Mods";
+                ul.before(h3);
+            };
+            return ul;
+        }
     }
 
     const removeChatError = function (inputElement, command) {
         setTimeout(function (command) {
             const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
+            if (chatBox.querySelector(".message-error") == undefined) return;
             const errorElement = Array.from(chatBox.querySelectorAll(".message-error"))
                 .findLast(c => c.innerHTML.startsWith("The command \"/" + command + "\" does not exist."));
-            if (errorElement != void 0) errorElement.remove();
+            if (errorElement != undefined) errorElement.remove();
         }, 0, command);
     }
 
@@ -358,7 +583,7 @@
         if (!_ratings[trainerName] || _ratings[trainerName].accessTime + 60000 < Date.now()) {
             _timeoutIds[trainerName + "ratings"] = util.debounce(function () {
                 util.loadRatingsData(util.slugify(trainerName), consts.urls.ratingsDataUrl).then(data => {
-                    if (data == void 0) return;
+                    if (data == undefined) return;
                     _ratings[trainerName] = data.ratings;
                     _ratings[trainerName].registertime = data.registertime;
                     _ratings[trainerName].accessTime = Date.now();
@@ -371,16 +596,31 @@
         const format = window.location.pathname.startsWith("/battle")
             ? window.location.pathname.split("-")[1]
             : window.location.pathname.split("-")[0].substring(1);
-        util.loadLadderData(format, consts.urls.laddersUrl).then(data => {
-            if (data) _ladders[format] = data.toplist.map(t => t.userid);
+            if (format === "") return;
+            util.loadLadderData(format, consts.urls.laddersUrl).then(data => {
+                if (data) _ladders[format] = data.toplist.map(t => t.userid);
+            });
+    }
+
+    const loadRoobyLadderData = function() {
+        return util.loadRooBYLadderData().then(data => {
+            _roobyLadders = data;
+            updateRoobyBattles(data);
+            showRoobyLadder(data);
+        });
+    }
+
+    const loadRoobyLeaderboardData = function() {
+        return util.loadRooBYLeaderboardData().then(data => {
+            _roobyLeaderboards = data;
         });
     }
 
     const recoveryFailureCheck = function (tab, trainerName, pokemonId, isRight) {
-        if (!_settings.miscCalculator || pokemonId == void 0) return;
+        if (!_settings.miscCalculator || pokemonId == undefined) return;
         const dexMons = Object.keys(consts.pokedex).map(k => consts.pokedex[k]);
         const pokemonName = dexMons.find(p => p.id == pokemonId).name;
-        if (pokemonName == void 0) return;
+        if (pokemonName == undefined) return;
         const roomElement = playUtil.getRoomElementByTabId(tab);
         const statElement = playUtil.getStatElementBySide(roomElement, isRight);
         const { healthRemainingPercent } = playUtil.getPokemonHealth(null, statElement);
@@ -427,7 +667,7 @@
     const calculateUnrevealedPokemon = function (trainer, roomElement) {
 
         const typeCheckReturnFunction = function (tab, trainerName, result) {
-            if (result != void 0 && result.odds != void 0) {
+            if (result != undefined && result.odds != undefined) {
                 const monNumbers = result.currentTeamNumbers;
                 _unrevealedPokemonOdds[tab] = _unrevealedPokemonOdds[tab] ?? {};
                 _unrevealedPokemonOdds[tab][trainerName] = _unrevealedPokemonOdds[tab][trainerName] ?? {};
@@ -450,7 +690,7 @@
                                     const revealedPokemonNumbers = revealedPokemonIds.map(rpi => _pokemons.find(p => p.id === rpi)).map(p => p.number).sort((a, b) => a - b).join(",")
                                         + (opponentHasDitto ? "DITTO" : "");
                                     if (revealedPokemonNumbers === monNumbers && monNumbers === tooltip.getAttribute("data-pokemon")) {
-                                        checkingElement.innerHTML = "Calculations finished! Hover over again to see the odds.";
+                                        checkingElement.textContent = "Calculations finished! Hover over again to see the odds.";
                                     }
                                 }
                             }
@@ -470,7 +710,7 @@
         const opponentRevealedPokemon = playUtil.getRevealedPokemonIds(opponentTrainer) || [];
         let tab = roomElement.id.substring(roomElement.id.lastIndexOf("-") + 1, roomElement.id.length);
         if (tab === "") tab = "replay";
-        if (_timeoutIds[tab] == void 0) initializeTab(tab, trainerName);
+        if (_timeoutIds[tab] == undefined) initializeTab(tab, trainerName);
         const opponentHasDitto = _hiddenDitto[tab] === opponentTrainerName || opponentRevealedPokemon.some(p => p === "ditto");
         const pokemons = [..._pokemons];
         _timeoutIds[tab][trainerName] = util.debounce(roobyCalc.buildTeamTree, 100, _timeoutIds[tab][trainerName], tab, trainerName, 
@@ -495,7 +735,7 @@
 
         let unrevealedPokemonOdds = {};
         if (revealedPokemonIds.length !== 0) {
-            if (_unrevealedPokemonOdds[tab] != void 0 && _unrevealedPokemonOdds[tab][trainerName] != void 0) {
+            if (_unrevealedPokemonOdds[tab] != undefined && _unrevealedPokemonOdds[tab][trainerName] != undefined) {
                 unrevealedPokemonOdds = _unrevealedPokemonOdds[tab][trainerName][dittoMonNumbers] || unrevealedPokemonOdds;
             }
             calculateUnrevealedPokemon(trainerElement, roomElement);
@@ -593,52 +833,6 @@
     }
 
     const showTrainerTooltip = function (element) {
-        const calculateWinRate = function (ratings, opponentRatings) {
-            const eloWinRate = calculateEloWinRate(ratings?.elo, opponentRatings?.elo);
-            const glickoWinRate = calculateGlickoWinRate(ratings?.rpr, ratings?.rprd, opponentRatings?.rpr, opponentRatings?.rprd);
-            const lowestDeviation = Math.min(ratings?.rprd || 0, opponentRatings?.rprd || 0);
-            const eloWeight = (Math.min(lowestDeviation, 125) - 25) / 200;
-            const glickoWeight = 1- eloWeight;
-            return isNaN(glickoWinRate) ? eloWinRate : (eloWinRate * eloWeight) + (glickoWinRate * glickoWeight);
-        }
-    
-        const calculateGlickoWinRate = function (rating, ratingDeviation, opponentRating, opponentRatingDeviation) {
-            if (!rating || !ratingDeviation || !opponentRating || !opponentRatingDeviation) return;
-            const pi2 = 9.8696044;
-            const q = 0.00575646273;    
-            const rd = Math.sqrt(ratingDeviation * ratingDeviation + opponentRatingDeviation * opponentRatingDeviation);
-            const g = 1 / Math.sqrt(1 + 3 * q * q * rd * rd / pi2);
-            return 1 / (1 + Math.pow(10, -1 * g * (rating - opponentRating) / 400));
-        }
-    
-        const calculateEloWinRate = function (rating, opponentRating) {
-            if (!rating || rating < 1000) rating = 1000;
-            if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
-            const eloWinRate = 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
-            return eloWinRate;
-        }
-
-        const calculateElo = function(rating, opponentRating, result) {
-            if (!rating || rating < 1000) rating = 1000;
-            if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
-            let k = 50;
-			if (rating < 1100) {
-				if (result === -1) {
-					k = 20 + (rating - 1000)*30/100;
-				} else if (result === 1) {
-					k = 80 - (rating - 1000)*30/100;
-				}
-			} else if (rating > 1300) {
-				k = 40;
-			} else if (rating >= 1600) {
-                k = 32;
-            }
-            var winRate = calculateEloWinRate(rating, opponentRating);
-            let change = k * (((result + 1) / 2) - winRate);
-            if (rating + change < 1000) change = 1000 - rating;
-            return change;
-        }
-
         if (_settings.trainerTooltip === false) return;
         const trainerNameWithSpaces = playUtil.getTrainerNameByElement(element.closest(".trainer"), false);
         const userId = trainerNameWithSpaces.replace(/\s/g,'').toLowerCase();
@@ -673,22 +867,32 @@
         const roomElement = playUtil.getParentRoomElement(element, _page);
         const winProbabilityValueSpan = document.createElement('span');
         const eloChangeValueSpan = document.createElement('span');
+
+        const battleLog = roomElement.querySelector(".battle-log");
+        const small = battleLog.querySelector("small");
+        const isRoobyBattle = small.getAttribute("data-rooby") === "true";
+
         winProbabilityValueSpan.textContent = "Loading...";
         if (_ratings[userId]) {
             const isRight = playUtil.getIsRightByChildElement(element);
             const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
             const opponentId = playUtil.getTrainerNameByElement(opponentTrainerElement).replace(/\s/g, '').toLowerCase();
-            if (elo === "Loading..." || _page === "play") elo = _ratings[userId][format]?.elo ? Math.round(_ratings[userId][format].elo) : 1000;
-            const eloLoss = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, -1);
-            const eloTie = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 0);
-            const eloGain = calculateElo(_ratings[userId][format]?.elo, _ratings[opponentId][format]?.elo, 1);
+            const roobyFormat = isRoobyBattle ? "rooby_crazyhouse" : format;
+            const leaderboards = _roobyLeaderboards[roobyFormat] ? _roobyLeaderboards[roobyFormat][userId] ? _roobyLeaderboards[roobyFormat][userId] : {} : {};
+            const opponentLeaderboards = _roobyLeaderboards[roobyFormat] ? _roobyLeaderboards[roobyFormat][opponentId] ? _roobyLeaderboards[roobyFormat][opponentId] : {} : {};
+            const eloRating = isRoobyBattle ? leaderboards?.Elo : _ratings[userId][roobyFormat]?.elo;
+            const opponentEloRating = isRoobyBattle ? opponentLeaderboards?.Elo : _ratings[opponentId][roobyFormat]?.elo;
+            if (elo === "Loading..." || _page === "play") elo = eloRating ? Math.round(eloRating) : 1000;
+            const eloLoss = roobyCalc.Elo(eloRating, opponentEloRating, -1);
+            const eloTie = roobyCalc.Elo(eloRating, opponentEloRating, 0);
+            const eloGain = roobyCalc.Elo(eloRating, opponentEloRating, 1);
             if (_ratings[userId].registertime > 0) age = new Date(_ratings[userId].registertime * 1000).toLocaleDateString("en-US");
             else age = "Unregistered";
-            gxe = _ratings[userId][format]?.gxe ? `${_ratings[userId][format].gxe}%` : "50.0%";
-            glicko = _ratings[userId][format]?.rpr
-                ? `${Math.round(_ratings[userId][format].rpr)} ± ${Math.round(_ratings[userId][format].rprd)}`
+            gxe = _ratings[userId][roobyFormat]?.gxe ? `${_ratings[userId][roobyFormat].gxe}%` : "50.0%";
+            glicko = _ratings[userId][roobyFormat]?.rpr
+                ? `${Math.round(_ratings[userId][roobyFormat].rpr)} ± ${Math.round(_ratings[userId][roobyFormat].rprd)}`
                 : "1500 ± 130";
-            const winRate = calculateWinRate(_ratings[userId][format], _ratings[opponentId][format]);
+            const winRate = roobyCalc.winRate(_ratings[userId][roobyFormat], _ratings[opponentId][roobyFormat]);
             winProbabilityValueSpan.className = winRate > .5 ? "green" : "red";
             winProbabilityValueSpan.textContent = (winRate * 100).toFixed(2) + "%";
             eloChangeValueSpan.className = eloGain > 0 ? "green" : eloLoss > 0 ? "red" : "black";
@@ -719,7 +923,7 @@
         const eloSpan = document.createElement('span');
         eloSpan.className = 'section';
         const eloTitle = document.createElement('span');
-        eloTitle.textContent = 'Elo:';
+        eloTitle.textContent = (isRoobyBattle ? "RooBY " : "") + 'Elo:';
         const eloInfoSpan = document.createElement('span');
         eloInfoSpan.className = 'info';
         const eloBold = document.createElement('b');
@@ -728,27 +932,29 @@
         eloSpan.appendChild(eloTitle);
         eloSpan.appendChild(eloInfoSpan);
         eloSpan.appendChild(document.createElement('br'));
-        
-        const gxeTitleSpan = document.createElement('span');
-        gxeTitleSpan.textContent = 'GXE:';
-        const gxeInfoSpan = document.createElement('span');
-        gxeInfoSpan.className = 'info';
-        gxeInfoSpan.textContent = gxe;
-        eloSpan.appendChild(gxeTitleSpan);
-        eloSpan.appendChild(gxeInfoSpan);
-        eloSpan.appendChild(document.createElement('br'));
 
-        const glickoTitleSpan = document.createElement('span');
-        glickoTitleSpan.textContent = 'Glicko-1:';
-        const glickoInfoSpan = document.createElement('span');
-        glickoInfoSpan.className = 'info';
-        glickoInfoSpan.textContent = glicko;
-        eloSpan.appendChild(glickoTitleSpan);
-        eloSpan.appendChild(glickoInfoSpan);
-        eloSpan.appendChild(document.createElement('br'));
+        if (!isRoobyBattle) {
+            const gxeTitleSpan = document.createElement('span');
+            gxeTitleSpan.textContent = 'GXE:';
+            const gxeInfoSpan = document.createElement('span');
+            gxeInfoSpan.className = 'info';
+            gxeInfoSpan.textContent = gxe;
+            eloSpan.appendChild(gxeTitleSpan);
+            eloSpan.appendChild(gxeInfoSpan);
+            eloSpan.appendChild(document.createElement('br'));
+    
+            const glickoTitleSpan = document.createElement('span');
+            glickoTitleSpan.textContent = 'Glicko-1:';
+            const glickoInfoSpan = document.createElement('span');
+            glickoInfoSpan.className = 'info';
+            glickoInfoSpan.textContent = glicko;
+            eloSpan.appendChild(glickoTitleSpan);
+            eloSpan.appendChild(glickoInfoSpan);
+            eloSpan.appendChild(document.createElement('br'));
+        }
 
         p.appendChild(eloSpan);
-        
+
         const winProbabilitySpan = document.createElement('span');
         winProbabilitySpan.className = 'section';
         const winProbabilityTitleSpan = document.createElement('span');
@@ -758,7 +964,7 @@
         winProbabilitySpan.appendChild(winProbabilityValueSpan);
         winProbabilitySpan.appendChild(document.createElement('br'));
         
-        if (roomElement.querySelector(".rated")) {
+        if (roomElement.querySelector(".rated") || isRoobyBattle) {
             const eloChangeTitleSpan = document.createElement('span');
             eloChangeTitleSpan.textContent = 'Elo change:';
             eloChangeValueSpan.className = 'info';
@@ -798,12 +1004,12 @@
             let hasReflect = false;
             let hasLightScreen = false;
             const boosts = {};
-            if (statElement != void 0 && statElement.querySelector(".status") != void 0) {
+            if (statElement != undefined && statElement.querySelector(".status") != undefined) {
                 const statStatusElement = statElement.querySelector(".status");
                 const statusElements = statStatusElement.children.length === 0
                     ? [statStatusElement]
                     : [...statStatusElement.children];
-                if (tooltip != void 0 && tooltip.querySelector(".status") != void 0) {
+                if (tooltip != undefined && tooltip.querySelector(".status") != undefined) {
                     status = tooltip.querySelector(".status").innerText;
                 }
                 else {
@@ -812,11 +1018,11 @@
                     }
                     else {
                         const statusChild = Array.from(statStatusElement.children).find(e => e.className !== "bad" && e.className !== "good");
-                        if (statusChild != void 0) status = statusChild.innerText;
+                        if (statusChild != undefined) status = statusChild.innerText;
                     }
                 }
                 let isActive = true;
-                if (tooltip != void 0 && !tooltip.classList.contains("tooltip-move")) {
+                if (tooltip != undefined && !tooltip.classList.contains("tooltip-move")) {
                     const tooltipPokemonName = playUtil.getPokemonNameFromTooltip(tooltip, _pokemons);
                     const pokemonId = playUtil.getPokemonIdByName(tooltipPokemonName);
                     isActive = playUtil.getActivePokemonId(trainerElement) === pokemonId;
@@ -845,12 +1051,13 @@
 
         const buildTooltipPokemon = function (tooltip, roomElement, isRight, pokemonId) {
             const pokemons = [..._pokemons];
-            if (tooltip != void 0 && !!pokemons) {
+            if (tooltip != undefined && !!pokemons) {
                 const statElement = playUtil.getStatElementBySide(roomElement, isRight);
                 const opponentStatElement = playUtil.getStatElementBySide(roomElement, !isRight);
                 const opponentTrainerElement = playUtil.getTrainerElementBySide(roomElement, !isRight);
 
                 let { exactHealth, healthRemainingPercent } = playUtil.getPokemonHealth(tooltip.querySelectorAll("p")[0].childNodes[1], statElement);
+                //let attackMultiplier = playUtil.getAttackMultiplier(roomElement, isRight);
                 const tab = playUtil.getTabIdByRoomElement(roomElement);
                 const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                 const trainerName = playUtil.getTrainerNameByElement(trainerElement);
@@ -865,19 +1072,20 @@
                     boosts: status.boosts,
                     status: status.status,
                     hasReflect: status.hasReflect,
-                    hasLightScreen: status.hasLightScreen
+                    hasLightScreen: status.hasLightScreen,
+                    //attackMultiplier: attackMultiplier
                 }
-                if (pokemon.level == void 0) return;
+                if (pokemon.level == undefined) return;
                 const transformedId = playUtil.getTransformedId(trainerElement, statElement);
                 const opponentTrainerName = playUtil.getTrainerNameByElement(opponentTrainerElement);
                 if (isActive && transformedId !== pokemon.id) {
-                    pokemon.transformedId = transformedId,
-                        pokemon.transformedLevel = playUtil.getPokemonLevelById(_levels, _timeoutIds, tab, opponentTrainerName, transformedId, !isRight)
-                    if (pokemon.transformedLevel == void 0) return;
+                    pokemon.transformedId = transformedId;
+                    pokemon.transformedLevel = playUtil.getPokemonLevelById(_levels, _timeoutIds, tab, opponentTrainerName, transformedId, !isRight);
+                    if (pokemon.transformedLevel == undefined) return;
                 }
                 const opponentPokemonId = playUtil.getActivePokemonId(opponentTrainerElement);
                 const opponentStatus = getStatus(opponentStatElement, opponentTrainerElement);
-                if (opponentPokemonId != void 0) {
+                if (opponentPokemonId != undefined) {
                     const opponent = {
                         healthRemainingPercent: Number.parseInt(opponentStatElement.querySelector(".hptext").childNodes[0].nodeValue.trim().replace("%", "")),
                         id: opponentPokemonId,
@@ -887,12 +1095,12 @@
                         hasReflect: opponentStatus.hasReflect,
                         hasLightScreen: opponentStatus.hasLightScreen
                     }
-                    if (opponent.level == void 0) return;
+                    if (opponent.level == undefined) return;
                     const opponentTransformedId = playUtil.getTransformedId(opponentTrainerElement, opponentStatElement)
                     if (opponentTransformedId !== opponent.id) {
                         opponent.transformedId = opponentTransformedId;
                         opponent.transformedLevel = playUtil.getPokemonLevelById(_levels, _timeoutIds, tab, trainerName, opponentTransformedId, !isRight);
-                        if (opponent.transformedLevel == void 0) return;
+                        if (opponent.transformedLevel == undefined) return;
                     }
                     pokemon.opponent = opponent;
                 }
@@ -902,9 +1110,9 @@
 
         const tooltip = tooltipElement.querySelector(".tooltip-pokemon, .tooltip-switchpokemon, .tooltip-move, .tooltip-activepokemon");
         const roomElement = Array.from(document.querySelectorAll(".ps-room-opaque, div:not([class]) > .battle")).find(e => e.style.display !== "none");
-        if (tooltip != void 0) {
+        if (tooltip != undefined) {
             let section = tooltipElement.querySelector(".section");
-            if (tooltip.querySelector(".calculator") != void 0) return;
+            if (tooltip.querySelector(".calculator") != undefined) return;
             if (tooltip.classList.contains("tooltip-move") && _settings.damageCalculator !== false) {
                 const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
                 const activePokemonId = playUtil.getActivePokemonId(trainerElement);
@@ -922,8 +1130,8 @@
     }
 
     const showMoveTooltip = function (section, tooltip, roomElement, pokemon) {
-        if (pokemon.id == void 0) return;
-        if (tooltip.querySelector(".tooltip-section").querySelector(".calculator") != void 0) return;
+        if (pokemon.id == undefined) return;
+        if (tooltip.querySelector(".tooltip-section").querySelector(".calculator") != undefined) return;
         section = document.createElement("p");
         section.className = "section";
         const moveName = tooltip.querySelector("h2").childNodes[0].nodeValue;
@@ -932,35 +1140,68 @@
         let failureRate = Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
         failureRate = isNaN(failureRate) ? null : failureRate;
 
-        const damageCalc = roobyCalc.damage(pokemon, pokemon.opponent, moveName);
+        let damageCalc = roobyCalc.damage(pokemon, pokemon.opponent, moveName);
         const critDamageCalc = roobyCalc.damage(pokemon, pokemon.opponent, moveName, null, true);
+        if (damageCalc.critRate >= 1) damageCalc = critDamageCalc;
 
         if (!isNaN(damageCalc.maxDamage) || (damageCalc.minDamage === "?" && damageCalc.maxDamage === "?")) {
             const minDamage = damageCalc.minDamage === "?" ? "?" : ((damageCalc.minDamage * 100).toFixed(1) + "%");
             const maxDamage = damageCalc.maxDamage === "?" ? "?" : ((damageCalc.maxDamage * 100).toFixed(1) + "%");
-            let html = "<div class=\"calculator\"><div class=\"damage-container\"><span>Damage: " + minDamage + " - " + maxDamage + "</span>";
-            if (damageCalc.minRecoil != void 0) {
-                html += "<small class=\"recoil\">(" + (damageCalc.minRecoil * 100).toFixed(1) + "% - " + (damageCalc.maxRecoil * 100).toFixed(1) + "% recoil)</small>";
+            const calculatorDiv = document.createElement('div');
+            calculatorDiv.className = 'calculator';
+
+            const damageContainerDiv = document.createElement('div');
+            damageContainerDiv.className = 'damage-container';
+
+            const damageSpan = document.createElement('span');
+            damageSpan.textContent = 'Damage: ' + minDamage + ' - ' + maxDamage;
+            damageContainerDiv.appendChild(damageSpan);
+
+            if (damageCalc.minRecoil !== undefined) {
+                const recoilSmall = document.createElement('small');
+                recoilSmall.className = 'recoil';
+                recoilSmall.textContent = '(' + (damageCalc.minRecoil * 100).toFixed(1) + '% - ' + (damageCalc.maxRecoil * 100).toFixed(1) + '% recoil)';
+                damageContainerDiv.appendChild(recoilSmall);
             }
+
+            calculatorDiv.appendChild(damageContainerDiv);
+
             if (!isNaN(critDamageCalc.minDamage) && damageCalc.critRate < 1 && damageCalc.critRate > 0) {
-                html += "</div><div>Crit (" + (damageCalc.critRate * 100).toFixed(1) + "%): " + (critDamageCalc.minDamage * 100).toFixed(1) + "% - " + (critDamageCalc.maxDamage * 100).toFixed(1) + "%</div>"
+                const critDiv = document.createElement('div');
+                critDiv.textContent = 'Crit (' + (damageCalc.critRate * 100).toFixed(1) + '%): ' + (critDamageCalc.minDamage * 100).toFixed(1) + '% - ' + (critDamageCalc.maxDamage * 100).toFixed(1) + '%';
+                calculatorDiv.appendChild(critDiv);
             }
-            if (damageCalc.hkoPercentage != void 0) {
-                html += "<div class=\"hko\">" + (damageCalc.hkoPercentage * 100).toFixed(1) + "% chance to " + damageCalc.hkoMultiple + "HKO</div>";
+
+            if (damageCalc.hkoPercentage !== undefined) {
+                const hkoDiv = document.createElement('div');
+                hkoDiv.className = 'hko';
+                hkoDiv.textContent = (damageCalc.hkoPercentage * 100).toFixed(1) + '% chance to ' + damageCalc.hkoMultiple + 'HKO';
+                calculatorDiv.appendChild(hkoDiv);
+
                 if (damageCalc.hkoMultiple > 1 && damageCalc.critRate < 1 && damageCalc.critRate > 0) {
-                    html += "<div>" + (critDamageCalc.hkoPercentage * 100).toFixed(1) + "% chance to " + critDamageCalc.hkoMultiple + "HKO with crit</span></div>";
+                    const critHkoDiv = document.createElement('div');
+                    critHkoDiv.textContent = (critDamageCalc.hkoPercentage * 100).toFixed(1) + '% chance to ' + critDamageCalc.hkoMultiple + 'HKO with crit';
+                    calculatorDiv.appendChild(critHkoDiv);
                 }
-                else html += "</div>";
             }
-            section.innerHTML += html;
+
+            section.appendChild(calculatorDiv);
             tooltip.querySelector(".tooltip-section").before(section);
         }
-        else if (failureRate != void 0 && _settings.miscCalculator !== false) {
-            section.innerHTML += "<div class=\"calculator\"><div class=\"damage-container\"><small class=\"failure p"
-                + (failureRate * 100).toFixed(0) + "\">("
-                + (failureRate != 0 && failureRate != 1 ? "~" : "")
-                + (failureRate * 100).toFixed(0)
-                + "% chance of failure)</small></div>";
+        else if (failureRate != undefined && _settings.miscCalculator !== false) {
+            const calculatorDiv = document.createElement('div');
+            calculatorDiv.className = 'calculator';
+
+            const damageContainerDiv = document.createElement('div');
+            damageContainerDiv.className = 'damage-container';
+
+            const failureSmall = document.createElement('small');
+            failureSmall.className = 'failure p' + (failureRate * 100).toFixed(0);
+            failureSmall.textContent = '(' + (failureRate != 0 && failureRate != 1 ? '~' : '') + (failureRate * 100).toFixed(0) + '% chance of failure)';
+
+            damageContainerDiv.appendChild(failureSmall);
+            calculatorDiv.appendChild(damageContainerDiv);
+            section.appendChild(calculatorDiv);
             tooltip.querySelector(".tooltip-section").before(section);
         }
     }
@@ -968,15 +1209,17 @@
     const showPokemonTooltip = function (section, tooltip, roomElement, isRight, tooltipPokemon) {
                 
         const showRecoverFailureRate = function (revealedMoveElement, failureRate) {
-            if (failureRate != void 0 && _settings.miscCalculator !== false) {
+            if (failureRate != undefined && _settings.miscCalculator !== false) {
                 const recoverSpan = document.createElement("span");
-                recoverSpan.innerHTML = "<small class=\"failure p" + (failureRate * 100).toFixed(0) + "\">(" 
-                    + (failureRate != 0 && failureRate != 1 ? "~" : "") + (failureRate * 100).toFixed(0) + "% fail)</small>";
+                const small = document.createElement('small');
+                small.className = "failure p" + (failureRate * 100).toFixed(0);
+                small.textContent = '(' + (failureRate != 0 && failureRate != 1 ? '~' : '') + (failureRate * 100).toFixed(0) + '% fail)';
+                recoverSpan.appendChild(small);
                 revealedMoveElement.parentElement.insertBefore(recoverSpan, revealedMoveElement.nextSibling);
             }
         }
 
-        if (section == void 0) {
+        if (section == undefined) {
             section = document.createElement("p");
             section.className = "section";
         }
@@ -986,17 +1229,17 @@
         const isTransformed = playUtil.getIsTransformedByStatElement(trainerStatElement);
         const nameSmall = Array.from(h2.querySelectorAll("small"))
             .find(s => !s.innerHTML.startsWith(consts.transformedIntoString) && !s.innerHTML.startsWith("(L") && !s.innerHTML.startsWith("(Type"));
-        const pokemonName = nameSmall != void 0 && nameSmall.innerHTML != void 0 && nameSmall.innerHTML.indexOf("(") !== -1
+        const pokemonName = nameSmall != undefined && nameSmall.innerHTML != undefined && nameSmall.innerHTML.indexOf("(") !== -1
             ? nameSmall.innerHTML.substring(1, nameSmall.innerHTML.length - 1)
             : h2.childNodes[0].nodeValue.trim();
         const pokemon = _pokemons.find(p => p.name == pokemonName);
-        if (pokemon == void 0) return;
+        if (pokemon == undefined) return;
         const pokemonLevel = playUtil.getLevelFromStatElement(h2);
         const tab = playUtil.getTabIdByRoomElement(roomElement);
         const trainerName = playUtil.getTrainerNameByElement(trainerElement);
         setLevels(pokemonLevel, tab, trainerName, pokemon.id);
         const transformedSmall = Array.from(h2.querySelectorAll("small")).find(s => s.innerHTML.indexOf(consts.transformedIntoString) !== -1);
-        const transformedIntoName = transformedSmall != void 0
+        const transformedIntoName = transformedSmall != undefined
             ? transformedSmall.innerHTML.substring(transformedSmall.innerHTML.indexOf(consts.transformedIntoString) + consts.transformedIntoString.length, transformedSmall.innerHTML.length - 1)
             : pokemonName;
         tooltip.appendChild(section);
@@ -1004,7 +1247,7 @@
         if (_settings.miscCalculator !== false) {
             const confusionDamageSpan = document.createElement("span");
             confusionDamageSpan.className = "self-hit damage";
-            confusionDamageSpan.innerHTML = "(" + (pokemon.confusionDamage[0] * 100).toFixed(1) + "% or " + (pokemon.confusionDamage[1] * 100).toFixed(1) + "% self-hit)";
+            confusionDamageSpan.textContent = "(" + (pokemon.confusionDamage[0] * 100).toFixed(1) + "% or " + (pokemon.confusionDamage[1] * 100).toFixed(1) + "% self-hit)";
             const healthElement = tooltip.querySelectorAll("p")[0].childNodes[1];
             healthElement.parentElement.appendChild(confusionDamageSpan);
         }
@@ -1036,14 +1279,16 @@
         for (const revealedMoveElement of revealedMoveElements) {
             const revealedMoveName = revealedMoveElement.nodeValue.trim().substring(revealedMoveElement.nodeValue.trim().indexOf("• ") === -1 ? 0 : 2);
             const moveButton = Array.from(roomElement.querySelectorAll("button[name=chooseMove]")).find(b => b.childNodes[0].nodeValue === revealedMoveName);
-            if (tooltipPokemon.opponent != void 0) {
-                const damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, revealedMoveName);
-                let failureRate = moveButton == void 0 ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
+            if (tooltipPokemon.opponent != undefined) {
+                let damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, revealedMoveName);
+                if (damageCalc.critRate >= 1) damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, revealedMoveName, null, true);
+                if (damageCalc == undefined) return;
+                let failureRate = moveButton == undefined ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
                 failureRate = isNaN(failureRate) ? damageCalc.failureRate : failureRate;
                 if (!isNaN(damageCalc.maxDamage) && _settings.damageCalculator !== false) {
                     const damageSpan = document.createElement("span");
                     damageSpan.className = "damage";
-                    damageSpan.innerHTML = (damageCalc.minDamage * 100).toFixed(1) + "%-" + (damageCalc.maxDamage * 100).toFixed(1) + "%";
+                    damageSpan.textContent = (damageCalc.minDamage * 100).toFixed(1) + "%-" + (damageCalc.maxDamage * 100).toFixed(1) + "%";
                     const isSwitchPokemon = tooltip.classList.contains("tooltip-switchpokemon");
                     revealedMoveElement.parentElement.insertBefore(damageSpan, isSwitchPokemon ? revealedMoveElement.nextSibling : revealedMoveElement);
                 }
@@ -1051,7 +1296,7 @@
             }
             else {
                 const damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, revealedMoveName);
-                let failureRate = moveButton == void 0 ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
+                let failureRate = moveButton == undefined ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
                 failureRate = isNaN(failureRate) ? damageCalc.failureRate : failureRate;
                 showRecoverFailureRate(revealedMoveElement, failureRate);
             }
@@ -1061,23 +1306,38 @@
                 const probability = Math.round(move.probability * 100) / 100;
                 let className = "calculator";
                 if (probability == 0) className += " zero";
-                let moveString = "<div class='" + className + "'>• " + move.name + " <small>" + probability + "%";
-                if (tooltipPokemon.opponent != void 0) {
+                const moveDiv = document.createElement('div');
+                moveDiv.className = className;
+
+                const moveText = document.createTextNode('• ' + move.name + ' ');
+                moveDiv.appendChild(moveText);
+
+                const small = document.createElement('small');
+                small.textContent = probability + '%';
+
+                if (tooltipPokemon.opponent !== undefined) {
                     const damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, move.name);
                     const moveButton = Array.from(roomElement.querySelectorAll("button[name=chooseMove]")).find(b => b.childNodes[0].nodeValue === move.name);
-                    let failureRate = moveButton == void 0 ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
+                    let failureRate = moveButton == undefined ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
                     failureRate = isNaN(failureRate) ? damageCalc.failureRate : failureRate;
+
                     if (((!isNaN(damageCalc.minDamage) && !isNaN(damageCalc.maxDamage)) || (damageCalc.minDamage === "?" && damageCalc.maxDamage === "?")) && _settings.damageCalculator !== false) {
                         const minDamage = damageCalc.minDamage === "?" ? "?" : ((damageCalc.minDamage * 100).toFixed(1) + "%");
                         const maxDamage = damageCalc.maxDamage === "?" ? "?" : ((damageCalc.maxDamage * 100).toFixed(1) + "%");
-                        moveString += " <span class='damage'>" + minDamage + "-" + maxDamage + "</span>";
-                    }
-                    else if (failureRate != void 0 && _settings.miscCalculator !== false) {
-                        moveString += "<span class=\"failure p" + (failureRate * 100).toFixed(0) + "\">(" + (failureRate * 100).toFixed(0) + "% fail)</span>";
+                        const damageSpan = document.createElement('span');
+                        damageSpan.className = 'damage';
+                        damageSpan.textContent = minDamage + '-' + maxDamage;
+                        small.appendChild(damageSpan);
+                    } else if (failureRate !== undefined && _settings.miscCalculator !== false) {
+                        const failureSpan = document.createElement('span');
+                        failureSpan.className = 'failure p' + (failureRate * 100).toFixed(0);
+                        failureSpan.textContent = '(' + (failureRate * 100).toFixed(0) + '% fail)';
+                        small.appendChild(failureSpan);
                     }
                 }
-                moveString += "</small></div>";
-                section.innerHTML += moveString;
+
+                moveDiv.appendChild(small);
+                section.appendChild(moveDiv);
             }
         }
     }
@@ -1086,20 +1346,58 @@
         const args = value.split(" ").map(a => a.toLowerCase());
         const simulationTypes = ["pokemon", "types", "dual types"];
         if (args.length > 2 && args[1] === "dual" && args[2] === "types") args[1] = "dual types";
-        const example = "<b>Example:</b> /odds dual types [butterfree, golduck, vulpix] ditto:true";
+        const examplesTitle = [
+            {b: "Examples:"}
+        ];
+        const exampleTitle = [
+            {b: "Examples:"}
+        ];
+        const example1 = [
+            {code: "/unrevealed dual types [butterfree, golduck]"}
+        ];
+        const example2 = [
+            {code: "/unrevealed types [gengar, pinsir, snorlax] ditto:true simulations:200000"}
+        ];
         if (args.length === 1 || args[1] === "help") {
-            playUtil.chatOutput(target, 
-                "Use the command /odds followed by the simulation type, the team between brackets and optionally <i>\"ditto:true.\"</i> and <i>\"simulations:200000.\"</i><br>" 
-                + "Valid simulation types are: " + simulationTypes.map(st => "<i>\"" + st + "\"</i>").join(", ") + ".<br>"
-                + example);
+            const help = [
+                {text: "Use the command "},
+                {code: "/unrevealed"},
+                {text: " followed by the simulation type, the Pokémon team between brackets and optionally "},
+                {i: "\"ditto:true\""},
+                {text: " and "},
+                {i: "\"simulations:NUMBER\""},
+                {text: "."}
+            ];
+            const simTypes = [
+                {text: "Valid simulation types are: "}
+            ]
+            for (const simulationType of simulationTypes) {
+                simTypes.push({i: "\"" + simulationType + "\""});
+                if (simulationType !== simulationTypes[simulationTypes.length - 1]) simTypes.push({text: ", "});
+                else simTypes.push({text: "."});
+            }
+            playUtil.chatOutput(target, [help, simTypes, examplesTitle, example1, example2]);
         }
         else if (!simulationTypes.includes(args[1])) {
-            playUtil.chatOutput(target, 
-                "<span class=\"failure\">Invalid simulation type.</span> Valid types are: <i>\"" + simulationTypes.join("\"</i>, <i>\"") + "\"</i>.<br>" + example);
+            const invalid = [
+                {span: "Invalid simulation type.", properties: [{ class: "failure" }]},
+                {text: " Valid types are: "}
+            ];
+            for (const simulationType of simulationTypes) {
+                invalid.push({i: "\"" + simulationType + "\""});
+                if (simulationType !== simulationTypes[simulationTypes.length - 1]) invalid.push({text: ", "});
+                else invalid.push({text: "."});
+            }
+            playUtil.chatOutput(target, [invalid, examplesTitle, example1, example2]);
         }
         else if (value.indexOf("[") === -1 || value.indexOf("]") === -1) {
-            playUtil.chatOutput(target, 
-                "<span class=\"failure\">Invalid team format.</span> Please use brackets to enclose the team. If team is empty, use an empty bracket \"<i>[]</i>\".<br>" + example);
+            const invalid = [
+                {span: "Invalid team format.", properties: [{ class: "failure" }]},
+                {text: " Please use brackets to enclose the team. If team is empty, use an empty bracket "},
+                {i: "\"[]\""},
+                {text: "."}
+            ];
+            playUtil.chatOutput(target, [invalid, examplesTitle, example1, example2]);
         }
         else {
             let simulations;
@@ -1107,7 +1405,11 @@
                 const simulationsArg = args.find(a => a.startsWith("simulations:"));
                 simulations = Number.parseInt(simulationsArg.substring(12, simulationsArg.length));
                 if (isNaN(simulations)) {
-                    playUtil.chatOutput(target, "<span class=\"failure\">Invalid simulations number.</span> Please use a valid number.<br>" + example + " simulations:200000");
+                    const invalid = [
+                        {span: "Invalid simulations number.", properties: [{ class: "failure" }]},
+                        {text: " Please use a valid number."}
+                    ];
+                    playUtil.chatOutput(target, [invalid, exampleTitle, example2]);
                     return;
                 }
             }
@@ -1119,15 +1421,20 @@
             const currentTeamNumbers = safePokemonIds.map(p => consts.pokedex[p].num);
             const isDitto = args.some(a => a === "ditto:true");
             const pokemons = [..._pokemons];
-            playUtil.chatOutput(target, "Calculating remaining " + (type === "pokemon" ? "Pokémon" : type) + ", please wait...");
+            const calculating = [
+                {text: "Calculating remaining " + (type === "pokemon" ? "Pokémon" : type) + ", please wait..."}
+            ]
+            playUtil.chatOutput(target, [calculating], "rooby-calculating");
             const oddsDisplay = function (key, odds, isApproximate) {
                 const isTotal = key === "Total";
                 isApproximate = isApproximate && odds > 0;
                 if (isTotal) key = "Total Pokémon";
                 else odds = (odds * 100).toFixed(1).replace(".0", "");
-                let output = "<b>" + key + ":</b> " + (isApproximate && !isTotal ? "~" : "") + odds + (isTotal ? "" : "%");
-                if (key === "Paralysis") output += "<br>";
-                return output;
+                const result = [
+                    {b: key + ":"},
+                    {text: (isApproximate && !isTotal ? " ~" : " ") + odds + (isTotal ? "" : "%")}
+                ]
+                return result;
             }
             api.runtime.sendMessage({ function: "simulate", args: { type, currentTeamNumbers, isDitto, pokemons, simulations } }, function (result) {
                 let output = Object.keys(result.odds)
@@ -1135,18 +1442,20 @@
                     .filter(o => type === "pokemon" ? o[1] > 0 : true)
                     .sort((a, b) => a[0].localeCompare(b[0]))
                     .sort((a, b) => b[1] - a[1])
-                    .sort((a, b) => b[0] === "Total" ? -1 : a[0] === "Total" ? 0 : 1)
-                    .sort((a, b) => a[0] === "Paralysis" ? -1 : b[0] === "Paralysis" ? 1 : 0)
-                    .sort((a, b) => a[0] === "Sleep" ? -1 : b[0] === "Sleep" ? 1 : 0)
-                    .map(o => oddsDisplay(o[0], o[1], currentTeamNumbers.length < 5 && simulations == void 0))
-                    .join("<br>");
+                    .sort((a, b) => b[0] === "Total" ? -1 : a[0] === "Total" ? 1 : 0)
+                    .sort((a, b) => a[0] === "Paralysis" ? -1 : b[0] === "Paralysis" ? 0 : 1)
+                    .sort((a, b) => a[0] === "Sleep" ? -1 : b[0] === "Sleep" ? 0 : 1)
+                    .map(o => oddsDisplay(o[0], o[1], currentTeamNumbers.length < 5 && simulations == undefined));
                 const pokemonNames = safePokemonIds.map(p => consts.pokedex[p].name).join(", ");
                 if (safePokemonIds.length < 3) result.simulations = result.simulations || consts.defaultSimulations * 4;
-                output = "<b>Remaining " + (type === "pokemon" ? "Pokémon" : type) + " for a"
+                const title = "Remaining " + (type === "pokemon" ? "Pokémon" : type) + " for a"
                     + (pokemonNames.length > 0 ? " " + pokemonNames : "n empty") + " team"
-                    + (result.simulations != void 0 ? " (" + result.simulations + " simulations)" : "")
-                    + ":</b><hr>" + output;
-                playUtil.chatOutput(target, output, "rooby-chat-info");
+                    + (result.simulations != undefined ? " (" + result.simulations + " simulations)" : "")
+                    + ":"
+                const simulateTitle = [
+                    {b: title}
+                ];
+                playUtil.chatOutput(target, [simulateTitle, ...output]);
                 void api.runtime.lastError;
             });
         }
@@ -1154,102 +1463,217 @@
 
     const showMovesets = function (target, value) {
         const args = value.split(" ").map(a => a.toLowerCase());
+        const example = [
+            {b: "Example:"},
+            {code: "/movesets Parasect"}
+        ];
         if (args.length === 1 || args[1] === "help") {
-            const example = "<b>Example:</b> /movesets Parasect";
-            playUtil.chatOutput(target, "Use the command /movesets followed by the name of the Pokémon.<br>" + example);
+            const title = [
+                {text: "Use the command "},
+                {code: "/movesets"},
+                {text: " followed by the name of the Pokémon."}
+            ];
+            playUtil.chatOutput(target, [title, example]);
         }
         else {
-            const name = util.getMostSimilarString(args[1], _pokemons.map(p => p.name));
-            const pokemon = _pokemons.find(p => p.name === name);
-            const moveSetDisplay = function (moveset) {
-                const moveNames = moveset.moves.map(m => consts.moves[m].name);
-                const output = moveNames.join(", ") + ": " + (moveset.percent * 100).toFixed(2) + "%";
-                return output;
+            const pokedexNames = Object.keys(consts.pokedex).map(p => consts.pokedex[p].name);
+            const joined = args.slice(1).join(" ");
+            const name = util.getMostSimilarString(joined, pokedexNames);
+            if (name == undefined) {
+                const invalid = [
+                    {span: "Invalid Pokémon name.", properties: [{ class: "failure" }]}
+                ]
+                playUtil.chatOutput(target, [invalid, example]);
             }
-            const moveSetsOutput = pokemon.moveSets
-                .sort((a, b) => a.moves.toString().localeCompare(b.moves.toString()))
-                .sort((a, b) => b.percent - a.percent)
-                .map(m => moveSetDisplay(m))
-                .join("<br>");
-            const output = "<b>Movesets for " + pokemon.name + ":</b><hr>" + moveSetsOutput;
-            playUtil.chatOutput(target, output, "rooby-chat-info");
+            else {
+                let pokemon = _pokemons.find(p => p.name === name);
+                if (pokemon == undefined) {
+                    const pokedexName = Object.keys(consts.pokedex).find(p => consts.pokedex[p].name === name);
+                    if (pokedexName == undefined) return;
+                    pokemon = { name: name, moveSets: [] };
+                }
+                const moveSetDisplay = function (moveset) {
+                    const moveNames = moveset.moves.map(m => consts.moves[m].name);
+                    return [
+                        {text: moveNames.join(", ") + ": "},
+                        {b: (moveset.percent * 100).toFixed(2) + "%"}
+                    ];
+                }
+                const moveSetsOutput = pokemon.moveSets
+                    .sort((a, b) => a.moves.toString().localeCompare(b.moves.toString()))
+                    .sort((a, b) => b.percent - a.percent)
+                    .map(m => moveSetDisplay(m));
+                const movesetsTitle = [
+                    {b: "Movesets for " + pokemon.name + ":"}
+                ];
+                playUtil.chatOutput(target, [movesetsTitle, ...moveSetsOutput]);
+            }
         }
     }
 
     const showMoves = function (target, value) {
         const args = value.split(" ").map(a => a.toLowerCase());
+        const example = [
+            {b: "Example:"},
+            {code: "/moves Slowbro"}
+        ];
         if (args.length === 1 || args[1] === "help") {
-            const example = "<b>Example:</b> /moves Slowbro";
-            playUtil.chatOutput(target, "Use the command /moves followed by the name of the Pokémon.<br>" + example);
+            const help = [
+                {text: "Use the command "},
+                {code: "/moves"},
+                {text: " followed by the name of the Pokémon."}
+            ]
+            playUtil.chatOutput(target, [help, example]);
         }
         else {
-            const name = util.getMostSimilarString(args[1], _pokemons.map(p => p.name));
-            const pokemon = _pokemons.find(p => p.name === name);
-            const moveSetDisplay = function (move) {
-                const output = move.name + ": " + (move.probability * 100).toFixed(2) + "%";
-                return output;
+            const pokedexNames = Object.keys(consts.pokedex).map(p => consts.pokedex[p].name);
+            const joined = args.slice(1).join(" ");
+            const name = util.getMostSimilarString(joined, pokedexNames);
+            if (name == undefined) {
+                const invalid = [
+                    {span: "Invalid Pokémon name.", properties: [{ class: "failure" }]}
+                ]
+                playUtil.chatOutput(target, [invalid, example]);
             }
-            const movesOutput = pokemon.moves
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .sort((a, b) => b.probability - a.probability)
-                .map(m => moveSetDisplay(m))
-                .join("<br>");
-            const output = "<b>Moves for " + pokemon.name + ":</b><hr>" + movesOutput;
-            playUtil.chatOutput(target, output, "rooby-chat-info");
+            else {
+                let pokemon = _pokemons.find(p => p.name === name);
+                if (pokemon == undefined) {
+                    const pokedexName = Object.keys(consts.pokedex).find(p => consts.pokedex[p].name === name);
+                    if (pokedexName == undefined) return;
+                    pokemon = { name: name, moves: [] };
+                }
+                const moveSetDisplay = function (move) {
+                    return [
+                        {text: move.name + ": "},
+                        {b: (move.probability * 100).toFixed(2) + "%"}
+                    ];
+                }
+                const movesOutput = pokemon.moves
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .sort((a, b) => b.probability - a.probability)
+                    .map(m => moveSetDisplay(m));
+                const title = [
+                    {b: "Moves for " + pokemon.name + ":"}
+                ];
+                playUtil.chatOutput(target, [title, ...movesOutput]);
+            }
         }
     }
 
     const showWinRate = function (target, value) {
         const args = value.split(" ").map(a => a.toLowerCase());
         const winrateTypes = ["personal", "opponent", "reset"];
-        const example = "<b>Example:</b> /winrates personal";
+        const example = [
+            {b: "Example:"},
+            {code: "/winrates personal"}
+        ]
         if (args.length === 1 || args[1] === "help") {
-            playUtil.chatOutput(target, 
-                "Use the command /winrates followed by the Pokémon winrate type. /winrates reset will wipe your Pokémon winrate records.<br>" 
-                + "Valid winrate types are: " + winrateTypes.map(st => "<i>\"" + st + "\"</i>").join(", ") + ".<br>"
-                 + example);
+            const help = [
+                {text: "Use the command "},
+                {code: "/winrates"},
+                {text: " followed by the Pokémon winrate type. "},
+                {code: "/winrates reset"},
+                {text: " will wipe your Pokémon winrate records."}
+            ];
+            const validTypes = [
+                {text: "Valid winrate types are: "}
+            ];
+            for (const winrateType of winrateTypes) {
+                validTypes.push({i: "\"" + winrateType + "\""});
+                if (winrateType !== winrateTypes[winrateTypes.length - 1]) validTypes.push({text: ", "});
+                else validTypes.push({text: "."});
+            }
+            playUtil.chatOutput(target, [help, validTypes, example]);
         }
         else if (!winrateTypes.includes(args[1])) {
-            playUtil.chatOutput(target, 
-                "<span class=\"failure\">Invalid Pokémon winrate type.</span> Valid types are: <i>\"" + winrateTypes.join("\"</i>, <i>\"") + "\"</i>.<br>" + example);
+            const invalid = [
+                {span: "Invalid Pokémon winrate type.", properties: [{ class: "failure" }]},
+                {text: " Valid types are: "},
+                {i: "\"" + winrateTypes.join("\", \"") + "\""},
+                {text: "."}
+            ]
+            playUtil.chatOutput(target, [invalid, example]);
         }
         else if (args[1] === "reset") {
             const newWinrates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
             _winRates = newWinrates;
             util.saveStorage("winRates", newWinrates);
-            playUtil.chatOutput(target, "<b>Personal and opponent Pokémon winrates reset.</b>", "rooby-chat-info");
+            const reset = [
+                {text: "Personal and opponent Pokémon winrates have been reset."}
+            ]
+            playUtil.chatOutput(target, [reset]);
         }
         else if (args[1] === "personal" || args[1] === "opponent") {
             const isPersonal = args[1] === "personal";
-            let output = "<b>" + (isPersonal ? "Personal" : "Opponent") + " winrates:</b><hr>";
+            const title = [
+                {b: (isPersonal ? "Personal" : "Opponent") + " winrates:"}
+            ]
+            const output = [];
             for (const pokemon of _pokemons) {
-                if (_winRates.wins == void 0) _winRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+                if (_winRates.wins == undefined) _winRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
                 const wins = (isPersonal ? _winRates.wins[pokemon.number] : _winRates.opponentWins[pokemon.number]) ?? 0;
                 const losses = (isPersonal ? _winRates.losses[pokemon.number] : _winRates.opponentLosses[pokemon.number]) ?? 0;
                 const percent = wins + losses > 0
                     ? ((wins / (wins + losses)) * 100).toFixed(2) + "%"
                     : "N/A";
-                output += pokemon.name + ": " + percent + " (" + (wins + losses) + " matches)<br>";
+                output.push([
+                    {b: pokemon.name + ":"},
+                    {text: " " + percent + " (" + (wins + losses) + " matches)"}
+                ]);
             }
-            playUtil.chatOutput(target, output, "rooby-chat-info");
+            playUtil.chatOutput(target, [title, ...output]);
         }
     }
 
     const showRooby = function (target) {
-        let output = "<b>RooBY Commands</b><hr>";
-        output += "<b>/odds</b> - Calculate the odds of a Pokémon or type appearing in a random battle. Use /odds help for more info.<br>";
-        output += "<b>/movesets</b> - Show all possible movesets for a Pokémon. Use /movesets help for more info.<br>";
-        output += "<b>/moves</b> - Show all possible moves for a Pokémon. Use /moves help for more info.<br>";
-        output += "<b>/winrates</b> - Show your winrate with individual Pokémon. Use /winrates help for more info.<br>";
-        output += "<b>/export</b> - Export the current battle's teams to the <a href=\"https://calc.pokemonshowdown.com/\" target=\"_new\">Showdown Damage Calculator</a>.<br>";
-        output += "<b>/rooby</b> - Show this message.<br>";
-        output += "Click the <i class=\"fa fa-cog\"></i> Options button on the top right to change RooBY settings.<br>";
-        playUtil.chatOutput(target, output, "rooby-chat-info");
+        const elements = [
+            [
+                {b: "RooBY Commands"}
+            ],
+            [
+                {code: "/unrevealed"},
+                {text: " - Calculate the odds of a Pokémon or type appearing in a random battle."}
+            ],
+            [
+                {code: "/movesets"},
+                {text: " - Calculate the movesets odds for a Pokémon."}
+            ],
+            [
+                {code: "/moves"},
+                {text: " - Calculate the move odds for a Pokémon."}
+            ],
+            [
+                {code: "/winrates"},
+                {text: " - Show your winrate with individual Pokémon."}
+            ],
+            [
+                {code: "/export"},
+                {text: " - Export the current battle's teams to the "},
+                {a: "Showdown Damage Calculator", properties: [
+                    { href: "https://calc.pokemonshowdown.com/randoms.html?gen=1&mode=randoms" },
+                    { target: "_new" },
+                ]},
+                {text: "."},
+            ],
+            [
+                {code: "/rooby"},
+                {text: " - Show this message."},
+            ],
+            [
+                {text: "Click the "},
+                {button: "", properties: [{ class: "icon button" }], children: [
+                    {i: "", properties: [{ class: "fa fa-cog" }] },
+                ]},
+                {text: " Options button on the top right of the page to change RooBY settings."}
+            ]
+        ];
+
+        playUtil.chatOutput(target, elements);
     }
 
     const getWinRates = async function() {
         let savedWinRates = await util.getStorage("winRates");
-        if (savedWinRates == void 0) savedWinRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
+        if (savedWinRates == undefined) savedWinRates = { wins: {}, losses: {}, opponentWins: {}, opponentLosses: {} };
         else savedWinRates = savedWinRates.winRates;
         _winRates = savedWinRates;
         return savedWinRates;
@@ -1257,12 +1681,12 @@
 
     const saveResult = async function(opponentName, tab, result, pokemons, opponentPokemons) {
         let savedResults = await util.getStorage("results");
-        if (savedResults == void 0) savedResults = {};
+        if (savedResults == undefined) savedResults = {};
         else savedResults = savedResults.results;
-        if (savedResults[opponentName] == void 0) savedResults[opponentName] = {};
-        if (savedResults[opponentName][tab] == void 0) {
+        if (savedResults[opponentName] == undefined) savedResults[opponentName] = {};
+        if (savedResults[opponentName][tab] == undefined) {
             savedResults[opponentName][tab] = result;
-            if (_results[opponentName] == void 0) _results[opponentName] = { wins: 0, draws: 0, losses: 0 };
+            if (_results[opponentName] == undefined) _results[opponentName] = { wins: 0, draws: 0, losses: 0 };
             if (result === 1) _results[opponentName].wins++;
             else if (result === 0) _results[opponentName].draws++;
             else if (result === -1) _results[opponentName].losses++;
@@ -1271,22 +1695,22 @@
             for (const pokemon of pokemons) {
                 const pokemonNumber = consts.pokedex[pokemon].num;
                 if (result === -1) {
-                    if (savedWinRates.losses[pokemonNumber] == void 0) savedWinRates.losses[pokemonNumber] = 0;
+                    if (savedWinRates.losses[pokemonNumber] == undefined) savedWinRates.losses[pokemonNumber] = 0;
                     savedWinRates.losses[pokemonNumber]++;
                 }
                 else if (result === 1) {
-                    if (savedWinRates.wins[pokemonNumber] == void 0) savedWinRates.wins[pokemonNumber] = 0;
+                    if (savedWinRates.wins[pokemonNumber] == undefined) savedWinRates.wins[pokemonNumber] = 0;
                     savedWinRates.wins[pokemonNumber]++;
                 }
             }
             for (const pokemon of opponentPokemons) {
                 const pokemonNumber = consts.pokedex[pokemon].num;
                 if (result === 1) {
-                    if (savedWinRates.opponentLosses[pokemonNumber] == void 0) savedWinRates.opponentLosses[pokemonNumber] = 0;
+                    if (savedWinRates.opponentLosses[pokemonNumber] == undefined) savedWinRates.opponentLosses[pokemonNumber] = 0;
                     savedWinRates.opponentLosses[pokemonNumber]++;
                 }
                 else if (result === -1) {
-                    if (savedWinRates.opponentWins[pokemonNumber] == void 0) savedWinRates.opponentWins[pokemonNumber] = 0;
+                    if (savedWinRates.opponentWins[pokemonNumber] == undefined) savedWinRates.opponentWins[pokemonNumber] = 0;
                     savedWinRates.opponentWins[pokemonNumber]++;
                 }
             }
@@ -1297,9 +1721,9 @@
 
     const getResults = async function(opponentName) {
         let savedResults = await util.getStorage("results");
-        if (savedResults == void 0) savedResults = {};
+        if (savedResults == undefined) savedResults = {};
         else savedResults = savedResults.results;
-        if (savedResults[opponentName] != void 0) {
+        if (savedResults[opponentName] != undefined) {
             let wins = 0;
             let draws = 0;
             let losses = 0;
@@ -1319,10 +1743,10 @@
         const exportTeam = function (team, trainerName) {
             let output = "";
             for (const pokemon of team) {
-                output += pokemon.name + " (" + trainerName + ")<br>";
-                output += "Level: " + pokemon.level + "<br>";
+                output += trainerName + " (" + pokemon.name + ")\n";
+                output += "Level: " + pokemon.level + "\n";
                 for (const move of pokemon.moves) {
-                    output += "- " + move + "<br>";
+                    output += "- " + move + "\n";
                 }
             }
             return output;
@@ -1332,18 +1756,27 @@
         target.removeAttribute("data-uid");
         const teams = [];
         const trainerNames = [];
+        const currents = [];
         for (let i = 0; i < teamInfos.length; i++) {
             teams[i] = [];
-            trainerNames[i] = target.closest(".ps-room").querySelectorAll(".trainer")[i].querySelector("strong").innerText.replace(/\s/g, '');
+            const trainer = target.closest(".ps-room").querySelectorAll(".trainer")[i];
+            trainerNames[i] = trainer.querySelector("strong").innerText.replace(/\s/g, '');
+            const picons = Array.from(trainer.querySelectorAll(".picon"));
+            const currentPicon = picons.find(p => p.getAttribute("aria-label").includes("(active)"));
+            const currentName = currentPicon ? currentPicon.getAttribute("aria-label").split(" (active)")[0] : null;
+            currents.push(currentName);
             for (const memberInfo of teamInfos[i]) {
                 const pokemon = _pokemons.find(p => p.name === memberInfo.name);
                 const revealedMoves = pokemon.moves.filter(m => memberInfo.moves.includes(m.name));
                 const unrevealedMoves = roobyCalc
-                    .unrevealedMoves(pokemon, revealedMoves)
+                    .unrevealedMoves(pokemon, revealedMoves);
+                const filteredUnrevealedMoves = unrevealedMoves == undefined
+                    ? []
+                    : unrevealedMoves
                     .filter(um => !revealedMoves.some(rm => rm.name === um.name))
                     .sort((a, b) => a.basePower - b.basePower)
                     .sort((a, b) => a.probability - b.probability);
-                const moves = revealedMoves.concat(unrevealedMoves);
+                const moves = revealedMoves.concat(filteredUnrevealedMoves);
                 const moveNames = moves.map(m => m.name);
                 const member = {
                     name: memberInfo.name,
@@ -1353,13 +1786,202 @@
                 teams[i].push(member);
             }
         }
-        const output = teams.map((t, i) => exportTeam(t, trainerNames[i])).join("<br><br>");
-        playUtil.chatOutput(target, output, "rooby-chat-info");
+        const output = teams.map((t, i) => exportTeam(t, trainerNames[i])).join("\n\n");
+        const encodedUri = encodeURI(btoa(output));
+        let href = "https://calc.pokemonshowdown.com/randoms.html?gen=1&mode=one-vs-one&import=" + encodedUri;
+        for (let i = 0; i < trainerNames.length; i++) {
+            if (trainerNames[i]) href += "&t" + (i + 1) + "=" + trainerNames[i];
+            if (currents[i]) href += "&p" + (i + 1) + "=" + currents[i];
+        }
+        const exportedTitle = [
+            {text: "Exported teams. "},
+            {a: "Click here to import into the Showdown Damage Calculator", properties: [
+                { href: href },
+                { target: "_new" },
+            ]},
+            {text: "."}
+        ]
+        playUtil.chatOutput(target, [exportedTitle]);
+    }
+
+    const updateRoobyBattles = function (battles) {
+        const battleLogs = document.querySelectorAll(".battle-log");
+        for (const battleLog of battleLogs) {
+            const tabId = playUtil.getTabIdByRoomElement(battleLog.closest(".ps-room"));
+            const battleHasTab = battles.some(b => b.link && b.link.indexOf(tabId) !== -1);
+            if (battleHasTab) {
+                const small = battleLog.querySelector("small");
+                if (small && small.textContent.endsWith(" joined")) {
+                    small.setAttribute("data-rooby", "true");
+                }
+            }
+        }
+    }
+
+    const showRoobyLadder = function (battles) {
+        const mainmenu = document.getElementById("room-").querySelector(".mainmenu");
+        if (_settings.roobyMatchmaking === false) return;
+        let roobyMenu = mainmenu.querySelector(".rooby-menu");
+        if (roobyMenu == undefined) {
+            roobyMenu = document.createElement("div");
+            mainmenu.children[0].after(roobyMenu);
+        }
+        roobyMenu.className = "menugroup rooby-menu list";
+        let image = roobyMenu.querySelector("img");
+        if (image == undefined) {
+            image = document.createElement("img");
+            image.src = api.runtime.getURL("images/icon-128.png");
+            roobyMenu.appendChild(image);
+        }
+        let roobyMenuTitle = roobyMenu.querySelector("p");
+        if (roobyMenuTitle == undefined) {
+            roobyMenuTitle = document.createElement("p");
+            roobyMenu.appendChild(roobyMenuTitle);
+        }
+        roobyMenuTitle.textContent = battles.length + " RooBY Matches";
+        let blocklinks = Array.from(roobyMenu.querySelectorAll("a.blocklink"));
+        for (let i = 0; i < blocklinks.length; i++) {
+            if (!battles.some(b => b.id === blocklinks[i].getAttribute("data-rooby-id"))) {
+                blocklinks[i].remove();
+            }
+        }
+        for (const battle of battles) {
+            if (_roobyFormats[battle.format] == undefined) continue;
+            const now = (new Date())/1000;
+            if (battle.link && now - battle.timestamp > 120) continue;
+            const loggedInName = document.querySelector(".usernametext")?.innerText.replace(/\s/g, '').toLowerCase();
+            if (loggedInName && battle.p1 === loggedInName && !battle.p2) {
+                battle.self = true;
+            }
+            let blocklink = blocklinks.find(bl => bl.getAttribute("data-rooby-id") == battle.id);
+            if (blocklink == undefined) {
+                const div = document.createElement("div");
+                blocklink = document.createElement("a");
+                blocklink.className = "blocklink";
+                blocklink.setAttribute("data-rooby-id", battle.id);
+                div.appendChild(blocklink);
+                roobyMenuTitle.after(div);
+            }
+            if (blocklink.getAttribute("data-rooby-id") == battle.id) {
+                let firstSmall = blocklink.querySelector("small");
+                if (firstSmall == undefined) {
+                    firstSmall = document.createElement("small");
+                    blocklink.appendChild(firstSmall);
+                }
+                if (battle.rating) {
+                    firstSmall.textContent = "(rated: " + battle.rating + ")";
+                }
+                else if (battle.link) {
+                    firstSmall.textContent = "Watch";
+                }
+                else if (battle.self) {
+                    firstSmall.textContent = "Cancel";
+                }
+                else if (!battle.p2) {
+                    firstSmall.textContent = "Join";
+                }
+                else {
+                    firstSmall.textContent = "Connecting";
+                }
+                firstSmall.style = "float: right";
+                let secondSmall = firstSmall.nextElementSibling;
+                if (secondSmall == undefined) {
+                    secondSmall = document.createElement("small");
+                    blocklink.appendChild(secondSmall);
+                }
+                secondSmall.textContent = "[Gen 1] " + _roobyFormats[battle.format].name;
+                let br = blocklink.querySelector("br");
+                if (br == undefined) {
+                    br = document.createElement("br");
+                    blocklink.appendChild(br);
+                }
+                let firstEm = blocklink.querySelector("em");
+                if (firstEm == undefined) {
+                    firstEm = document.createElement("em");
+                    if (battle.p2) firstEm.className = "p1";
+                    blocklink.appendChild(firstEm);
+                }
+                if (!battle.p2 && battle.self) {
+                    firstEm.textContent = " Searching...";
+                    const spinner = document.createElement("i");
+                    spinner.className = "fa fa-refresh fa-spin";
+                    firstEm.prepend(spinner);
+                }
+                else {
+                    firstEm.textContent = battle.p1;
+                    if (!battle.p2) firstEm.textContent += " (seeking)";
+                }
+                blocklink.setAttribute("data-rooby-id", battle.id);
+                const clone = blocklink.cloneNode(true);
+                blocklink.parentNode.replaceChild(clone, blocklink);
+                blocklink = clone;
+                if (battle.p2) {
+                    let thirdSmall = firstEm.nextElementSibling;
+                    if (thirdSmall == undefined) {
+                        thirdSmall = document.createElement("small");
+                        blocklink.appendChild(thirdSmall);
+                    }
+                    thirdSmall.textContent = "vs.";
+                    let secondEm = blocklink.querySelector("em.p2");
+                    if (secondEm == undefined) {
+                        secondEm = document.createElement("em");
+                        secondEm.className = "p2";
+                        blocklink.appendChild(secondEm);
+                    }
+                    secondEm.textContent = battle.p2;
+                    blocklink.appendChild(secondEm);
+                    blocklink.addEventListener("click", function (e) {
+                        const battleId = e.currentTarget.getAttribute("data-rooby-id");
+                        const battle = battles.find(b => b.id === battleId);
+                        playUtil.joinRoom(battle.link);
+                    });
+                }
+                else if (battle.self) {
+                    const spinner = document.createElement("i");
+                    spinner.className = "fa fa-refresh fa-spin";
+                    firstEm.prepend(spinner);
+                    blocklink.addEventListener("click", function (e) {
+                        const usernameText = document.querySelector(".usernametext");
+                        if (usernameText == undefined) return;
+                        const loggedInName = usernameText.innerText.replace(/\s/g,'').toLowerCase();
+                        const battleId = e.currentTarget.getAttribute("data-rooby-id");
+                        e.currentTarget.style.display = "none";
+                        util.requestRooBYLadder(loggedInName, null, battleId, true).then(function (battles) {
+                            showRoobyLadder(battles);
+                        });
+                    });
+                }
+                else {
+                    blocklink.addEventListener("click", function (e) {
+                        const usernameText = document.querySelector(".usernametext");
+                        if (usernameText == undefined) {
+                            playUtil.notify("You must be logged in to join a RooBY battle.");
+                            return;
+                        };
+                        const loggedInName = usernameText.innerText.replace(/\s/g,'').toLowerCase();
+                        const battleId = e.currentTarget.getAttribute("data-rooby-id");
+                        const battle = battles.find(b => b.id === battleId);
+                        const newBattles = battles.filter(b => b.id !== battleId);
+                        showRoobyLadder(newBattles);
+                        util.requestRooBYLadder(loggedInName, null, battleId).then(function (data) {
+                            showRoobyLadder(data.battles);
+                            const roomElement = document.getElementById("room-");
+                            const tab = playUtil.getTabIdByRoomElement(roomElement);
+                            playUtil.challenge(tab, battle.p1, _roobyFormats[battle.format], data.command, battle.id);
+                        });
+                    });
+                }
+            }
+        }
+        const emptyDivs = roobyMenu.querySelectorAll("div:empty");
+        for (const emptyDiv of emptyDivs) {
+            emptyDiv.remove();
+        }
     }
 
     const settingsPopup = function (element) {
         const avatarButton = element.querySelector("[name='avatars']");
-        if (avatarButton == void 0) {
+        if (avatarButton == undefined) {
             const avatarList = element.querySelector(".avatarlist");
             if (avatarList && !avatarList.querySelector("button[id]")) {
                 const avatarButtons = Array.from(avatarList.querySelectorAll("button:not([id])"));
@@ -1381,12 +2003,92 @@
                         const sprites = animated.length === 0 ? consts.trainerSprites : consts.animatedTrainerSprites;
                         const randomSprite = sprites[Math.floor(Math.random() * sprites.length)];
                         playUtil.changeAvatar(randomSprite, _settings.animateTrainer);
-                        _settings.randomAvatar = animated.length === 0 ? 2 : 1;
+                        _settings.randomAvatar = animated.length === 0 ? 1 : 2;
                         util.saveStorage("settings", "randomAvatar", _settings.randomAvatar);
                         this.parentElement.parentElement.querySelector("[name=close]").click();
                     });
                     avatarList.prepend(button);
                 }
+            }
+            else if (Array.from(element.childNodes).some(c => c.getAttribute("name") === "formats")) {
+                if (element.querySelector(".rooby-mods") || _settings.roobyMatchmaking === false) return;
+                const popupmenu = element.querySelector("[name=formats] .popupmenu");
+                const details = popupmenu.querySelector("details");
+                const detailsClone = details.cloneNode(true);
+                detailsClone.classList.add("rooby-mods");
+                detailsClone.setAttribute("section", "[Gen 1] RooBY Mods");
+                detailsClone.querySelector("strong").textContent = "RooBY Mods [Gen 1]";
+                const lis = detailsClone.querySelectorAll("li");
+                const roobyFormats = Object.keys(_roobyFormats);
+                const searchClick = function(e) {
+                    const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
+                    const roobyName = e.currentTarget.closest("form").getAttribute("data-rooby-name");
+                    const roobyFormats = Object.keys(_roobyFormats);
+                    const format = roobyFormats.find(fk => _roobyFormats[fk].name === roobyName);
+                    util.requestRooBYLadder(loggedInName, format).then(function (battles) {
+                        const lastBattle = battles[battles.length - 1];
+                        lastBattle.self = true;
+                        showRoobyLadder(battles);
+                    });
+                }
+                for (const formatKey of roobyFormats) {
+                    const format = _roobyFormats[formatKey];
+                    const newLi = lis[1].cloneNode(true);
+                    const button = newLi.querySelector("button");
+                    button.textContent = format.name;
+                    button.setAttribute("data-rooby-value", formatKey);
+                    button.value = format.command;
+                    button.addEventListener("click", function (e) {
+                        setTimeout(function () {
+                            const battleform = document.getElementById("room-").querySelector("form.battleform");
+                            const search = battleform.querySelector("button[name='search']");
+                            if (search) {
+                                const formatselect = battleform.querySelector("button.formatselect");
+                                formatselect.textContent = "[Gen 1] " + e.target.textContent;
+                                battleform.setAttribute("data-rooby-name", e.target.textContent);
+                                const newSearch = search.cloneNode(true);
+                                search.parentNode.replaceChild(newSearch, search);
+                                newSearch.addEventListener("click", searchClick);
+                            }
+                        }, 0);
+                        button.click();
+                    });
+                    detailsClone.appendChild(newLi);
+                }
+                for (const li of lis) {
+                    li.remove();
+                }
+                const buttons = Array.from(popupmenu.querySelectorAll("button"));
+                for (const button of buttons) {
+                    button.addEventListener("click", function () {
+                        const battleform = document.getElementById("room-").querySelector("form.battleform");
+                        battleform.removeAttribute("data-rooby-name");
+                    });
+                }
+                popupmenu.appendChild(detailsClone);
+            }
+            else if (element.querySelector("p")) {
+                if (element.querySelector("p").textContent !== "Error: Your format gen1customgame is not ladderable.") return;
+                const battleform = document.getElementById("room-").querySelector("form.battleform");
+                const formatselect = battleform.querySelector("button.formatselect");
+                element.querySelector("p").textContent = "Error: Your format " + formatselect.textContent + " is not ladderable with Pokemon Showdown. Would you like to try the RooBY ladder? (Note: You must enable spectators to gain Elo)";
+                const button = element.querySelector("button");
+                button.querySelector("strong").textContent = "Close";
+                const roobyButton = button.cloneNode(true);
+                roobyButton.querySelector("strong").textContent = "RooBY Ladder";
+                roobyButton.setAttribute("data-rooby-name", formatselect.textContent);
+                roobyButton.addEventListener("click", function (e) {
+                    const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
+                    const roobyName = e.currentTarget.getAttribute("data-rooby-name");
+                    const roobyFormats = Object.keys(_roobyFormats);
+                    const format = roobyFormats.find(fk => _roobyFormats[fk].name === roobyName);
+                    util.requestRooBYLadder(loggedInName, format).then(function (battles) {
+                        const lastBattle = battles[battles.length - 1];
+                        lastBattle.self = true;
+                        showRoobyLadder(battles);
+                    });
+                });
+                button.after(roobyButton);
             }
             return;
         };
@@ -1413,7 +2115,7 @@
             };
             const disableFunction = function (e) {
                 const checkbox = e.target.childNodes[0];
-                if (checkbox == void 0) return;
+                if (checkbox == undefined) return;
                 _settings[checkbox.name] = checkbox.checked;
                 util.saveStorage("settings", checkbox.name, _settings[checkbox.name]);
                 if (checkbox.name === "trainerTooltip") {
@@ -1435,6 +2137,12 @@
                             if (!img) continue;
                             playUtil.animateAvatar(img, "src", checkbox.checked);
                         }
+                    }
+                }
+                else if (checkbox.name === "roobyMatchmaking") {
+                    const menus = document.getElementsByClassName("rooby-menu");
+                    for (const menu of menus) {
+                        menu.style.display = checkbox.checked ? "block" : "none";
                     }
                 }
             };
@@ -1507,9 +2215,10 @@
             parent.after(playUtil.buildSettingsP("Disable unrevealed calculator", "unrevealedCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.unrevealedCalculator === false }));
             parent.after(playUtil.buildSettingsP("Disable moveset calculator", "movesetCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.movesetCalculator === false }));
             parent.after(playUtil.buildSettingsP("Disable damage calculator", "damageCalculator", className, null, null, disableFunction, { type: "checkbox", checked: _settings.damageCalculator === false }));
+            parent.after(playUtil.buildSettingsP("Disable RooBY matchmaking", "roobyMatchmaking", className, null, null, disableFunction, { type: "checkbox", checked: _settings.roobyMatchmaking === false }));
             const strongP = document.createElement("p");
             const strong = document.createElement("strong");
-            strong.innerHTML = "RooBY (Generation 1)";
+            strong.textContent = "RooBY (Generation 1)";
             strongP.appendChild(strong);
             parent.after(strongP);
             parent.after(document.createElement("hr"));
@@ -1528,7 +2237,7 @@
 
         const buildBackdropBottom = function (roomElement, tab, backdrop) {
             let backdropBottom = roomElement.querySelector("#backdropBottom");
-            if (backdropBottom == void 0) {
+            if (backdropBottom == undefined) {
                 backdropBottom = document.createElement("div");
                 backdropBottom.id = "backdropBottom";
                 roomElement.querySelector(".innerbattle").prepend(backdropBottom);
@@ -1567,12 +2276,12 @@
                 updateIcons(trainer);
             }
         }
-        if (element != null && element.style.backgroundImage != void 0) {
+        if (element != null && element.style.backgroundImage != undefined) {
             let backdrop = _settings.backdrop;
             const roomElement = playUtil.getParentRoomElement(element, _page);
-            if (roomElement == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
+            if (roomElement == undefined || roomElement.id.indexOf("-gen1") === -1) return;
             const tab = playUtil.getTabIdByRoomElement(roomElement);
-            if (_randomSprites[tab] == void 0) initializeTab(tab);
+            if (_randomSprites[tab] == undefined) initializeTab(tab);
             if (!_settings.backdrop || _settings.backdrop == 0) backdrop = "fx/bg-gen1.png";
             else if (_settings.backdrop == 1) backdrop = _randomBackdrop[tab];
             else if (_settings.backdrop == 2) backdrop = _randomDefaultBackdrop[tab];
@@ -1596,11 +2305,11 @@
 
     const updateIcons = function (trainer) {
         let iconsPrefix = _settings.sprites.icons || 0;
-        if (trainer == void 0) return;
+        if (trainer == undefined) return;
         const roomElement = playUtil.getParentRoomElement(trainer, _page);
         const tab = playUtil.getTabIdByRoomElement(roomElement);
-        if (tab == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
-        if (_randomSprites[tab] == void 0) initializeTab(tab);
+        if (tab == undefined || roomElement.id.indexOf("-gen1") === -1) return;
+        if (_randomSprites[tab] == undefined) initializeTab(tab);
         else if (iconsPrefix == 1) iconsPrefix = _randomSprites[tab].icons;
         else if (iconsPrefix == 2) iconsPrefix = _randomDefaultSprites[tab].icons;
         else if (iconsPrefix == 3) {
@@ -1608,7 +2317,7 @@
                 let backSetting = _settings.sprites.back;
                 if (_settings.sprites.back == 1) backSetting = _randomSprites[tab].back;
                 if (_settings.sprites.back == 2) backSetting = _randomDefaultSprites[tab].back;
-                if (backSetting == void 0) return;
+                if (backSetting == undefined) return;
                 if (backSetting == 0) backSetting = "gen1-back";
                 iconsPrefix = consts.spriteSets[backSetting.substring(0, backSetting.length - 5)].icons;
             }
@@ -1616,7 +2325,7 @@
                 let frontSetting = _settings.sprites.front;
                 if (_settings.sprites.front == 1) frontSetting = _randomSprites[tab].front;
                 if (_settings.sprites.front == 2) frontSetting = _randomDefaultSprites[tab].front;
-                if (frontSetting == void 0) return;
+                if (frontSetting == undefined) return;
                 if (frontSetting == 0) frontSetting = "gen1";
                 iconsPrefix = consts.spriteSets[frontSetting].icons;
             }
@@ -1648,15 +2357,15 @@
         const src = element.getAttribute("src");
         if (_settings.useModernSprites === true || (_page !== "play" && _page != "replay") || src.indexOf("/types/") !== -1) return;
         let urlStart = _playUrl + "/sprites/";
-        if (src.indexOf("/sprites/") !== -1 && _settings.sprites["front"] != void 0) {
+        if (src.indexOf("/sprites/") !== -1 && _settings.sprites["front"] != undefined) {
             let key = "front";
             if (src.indexOf("back") !== -1) {
                 key = "back";
             }
             const roomElement = playUtil.getParentRoomElement(element, _page);
             const tab = playUtil.getTabIdByRoomElement(roomElement);
-            if (tab == void 0 || roomElement.id.indexOf("-gen1") === -1) return;
-            if (_randomSprites[tab] == void 0) initializeTab(tab);
+            if (tab == undefined || roomElement.id.indexOf("-gen1") === -1) return;
+            if (_randomSprites[tab] == undefined) initializeTab(tab);
             const isRight = key !== "back";
             const trainerElement = playUtil.getTrainerElementBySide(roomElement, isRight);
             const trainerName = playUtil.getTrainerNameByElement(trainerElement);
@@ -1667,7 +2376,7 @@
             else if (_settings.sprites[key] == 1) spriteSrc = _randomSprites[tab][key];
             else if (_settings.sprites[key] == 2) spriteSrc = _randomDefaultSprites[tab][key];
             else spriteSrc = _settings.sprites[key];
-            if (spriteSrc == void 0) return;
+            if (spriteSrc == undefined) return;
             const spriteSetName = spriteSrc.indexOf("-") === -1 ? spriteSrc : spriteSrc.substring(0, spriteSrc.indexOf("-"));
             const substitute = consts.spriteSets[spriteSetName].substitute;
 
@@ -1731,7 +2440,8 @@
                 if (spriteSrc.indexOf("digimon") !== -1) {
                     const typos = consts.spriteSets[spriteSetName].typos;
                     const replaceSpace = key === "back" && pokemonId.indexOf("nidoran") !== -1;
-                    typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, replaceSpace, typos)
+                    typoedPokemonId = util.replaceIdWithSafeId(pokemonId, consts.pokedex, replaceSpace, typos);
+                    urlEnd = "/" + typoedPokemonId + "." + (extension ? extension : "png");
                 }
                 else if (spriteSrc.indexOf("afd-shiny") !== -1 || spriteSrc.indexOf("afd-back-shiny") !== -1) {
                     const typos = consts.spriteSets[spriteSetName].shinyTypos;
@@ -1769,19 +2479,19 @@
     }
 
     const setLevels = function (levels, tab, trainerName, pokemonId) {
-        if (tab != void 0 && trainerName != void 0 && pokemonId != void 0) {
+        if (tab != undefined && trainerName != undefined && pokemonId != undefined) {
             _levels[tab] = _levels[tab] || {};
             _levels[tab][trainerName] = _levels[tab][trainerName] || {};
             _levels[tab][trainerName][pokemonId] = levels;
         }
-        else if (tab != void 0 && trainerName != void 0 && pokemonId == void 0) {
+        else if (tab != undefined && trainerName != undefined && pokemonId == undefined) {
             _levels[tab] = _levels[tab] || {};
             _levels[tab][trainerName] = levels;
         }
-        else if (tab != void 0 && trainerName == void 0 && pokemonId == void 0) {
+        else if (tab != undefined && trainerName == undefined && pokemonId == undefined) {
             _levels[tab] = levels;
         }
-        else if (tab == void 0 && trainerName == void 0 && pokemonId == void 0) {
+        else if (tab == undefined && trainerName == undefined && pokemonId == undefined) {
             _levels = levels;
         }
     }

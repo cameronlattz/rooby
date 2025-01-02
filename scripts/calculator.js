@@ -295,7 +295,7 @@ window.roobyCalc = function() {
 	}
 
 	const buildTeamTree = function(tab, trainer, revealedPokemonNames, opponentRevealedPokemonNames, opponentHasDitto, pokemons, returnFunction) {
-		if (pokemons == void 0 || pokemons.length === 0) {
+		if (pokemons == undefined || pokemons.length === 0) {
 			setTimeout(function() { buildTeamTree(tab, trainer, revealedPokemonNames, opponentRevealedPokemonNames, opponentHasDitto, pokemons, returnFunction); }, 1000);
 			return;
 		}
@@ -310,19 +310,38 @@ window.roobyCalc = function() {
 		});
 	}
 
+	const getCritRate = function(pokemonId, moveName) {
+		const generation = calc.Generations.get(1);
+		const untransformedPokemon = new calc.Pokemon(generation, pokemonId);
+		const baseSpeed = untransformedPokemon.species.baseStats.spe;
+		let moveCritDivider = 512;
+		if (moveName) {
+			const move = Object.entries(consts.moves).filter(x => x[1].name === moveName)[0][1];
+			if (move.critRatio === 0) return 0;
+			if (move.critRatio > 1) moveCritDivider = moveCritDivider / 8;
+		}
+		return baseSpeed / moveCritDivider;
+	}
+
 	const damage = function(pokemon, opponent, moveName, moveBp, isCrit) {
 
 		const getCalculation = function(generation, pokemon, opposingPokemon, move, fieldEffects) {
 			const field = new calc.Field(generation);
-			if (fieldEffects != void 0) {
+			if (fieldEffects != undefined) {
 				field.defenderSide.isReflect = fieldEffects.defenderSide.isReflect;
 				field.defenderSide.isLightScreen = fieldEffects.defenderSide.isLightScreen;
 			}
-			const calculation = calc.calculate(generation, pokemon, opposingPokemon, move, field);
+			let calculation;
+			try {
+				calculation = calc.calculate(generation, pokemon, opposingPokemon, move, field);
+			}
+			catch (e) {
+				return;
+			}
 			const dexMove = Object.values(consts.moves).find(m => m.name === moveName);
-			if (dexMove.multihit != void 0) {
+			if (dexMove.multihit != undefined) {
 				const newDamage = [];
-				const multihit = dexMove.multihit[0] != void 0 ? dexMove.multihit : [dexMove.multihit, dexMove.multihit];
+				const multihit = dexMove.multihit[0] != undefined ? dexMove.multihit : [dexMove.multihit, dexMove.multihit];
 				for (let multiplier = multihit[0]; multiplier <= multihit[1]; multiplier++) {
 					const damages = isNaN(calculation.damage) ? calculation.damage : [calculation.damage];
 					for (const damageResult of damages) {
@@ -335,8 +354,8 @@ window.roobyCalc = function() {
 			return calculation;
 		}
 
-		const getTransformedStats = function(generation, pokemonId, pokemonLevel, transformedIntoId, transformedIntoLevel, boosts) {
-			const isTransformed = transformedIntoId != void 0 && pokemonId !== transformedIntoId;
+		const getTransformedStats = function(generation, pokemonId, pokemonLevel, transformedIntoId, transformedIntoLevel, boosts, isCrit) {
+			const isTransformed = (transformedIntoId != undefined && pokemonId !== transformedIntoId) && !isCrit;
 			const transformee = isTransformed ? new calc.Pokemon(generation, transformedIntoId, {level:transformedIntoLevel}) : {};
 			const calcPokemon = new calc.Pokemon(generation, pokemonId, {level:pokemonLevel});
 			const pokemonStats = {
@@ -352,6 +371,7 @@ window.roobyCalc = function() {
 			pokemonStats.stats.hp = calcPokemon.stats.hp;
 			pokemonStats.species.name = isTransformed ? transformee.species.name : calcPokemon.species.name;
 			pokemonStats.species.id = isTransformed ? transformee.species.id : calcPokemon.species.id;
+			pokemonStats.species.baseStats.hp = calcPokemon.species.baseStats.hp;
 			return pokemonStats;
 		}
 
@@ -365,25 +385,16 @@ window.roobyCalc = function() {
 			return healthRange;
 		}
 
-		const getCritRate = function(baseSpeed, moveName) {
-			let moveCritDivider = 512;
-			if (moveName) {
-				const move = Object.entries(consts.moves).filter(x => x[1].name === moveName)[0][1];
-				if (move.critRatio === 0) return 0;
-				if (move.critRatio > 1) moveCritDivider = moveCritDivider / 8;
-			}
-			return baseSpeed / moveCritDivider;
-		}
-
 		const generation = calc.Generations.get(1);
 		const move = new calc.Move(generation, moveName, {bp: moveBp, isCrit: isCrit});
 		const moveKey = Object.keys(consts.moves).filter(m => consts.moves[m].name === moveName)[0];
 		if (move.category === "Status" && !consts.recoveryMoves.includes(moveKey)) return {};
-		const pokemonStats = getTransformedStats(generation, pokemon.id, pokemon.level, pokemon.transformedId, pokemon.transformedLevel, pokemon.boosts);
+		const pokemonStats = getTransformedStats(generation, pokemon.id, pokemon.level, pokemon.transformedId, pokemon.transformedLevel, pokemon.boosts, move.isCrit);
 		if (consts.recoveryMoves.includes(moveKey)) {
 			if (pokemon.exactHealth) {
 				if (pokemon.exactHealth === pokemonStats.stats.hp) return { failureRate: 1 };
 				else if ((pokemonStats.stats.hp - pokemon.exactHealth) % 256 === 255) return { failureRate: 1 };
+				else return { failureRate: 0 };
 			}
 			else {
 				if (pokemon.healthRemainingPercent === 100) return { failureRate: 1 };
@@ -397,33 +408,34 @@ window.roobyCalc = function() {
 				return { failureRate: 0 };
 			}
 		}
-		if (opponent == void 0) return {};
-		const untransformedPokemon = new calc.Pokemon(generation, pokemon.id, pokemonStats);
-		const critRate = getCritRate(untransformedPokemon.species.baseStats.spe, move.name);
+		if (opponent == undefined) return;
+		const critRate = getCritRate(pokemon.id, move.name);
 		const safePokemonId = (!move.isCrit && !!pokemon.transformedId) ? pokemon.transformedId : pokemon.id;
 		const calcPokemon = new calc.Pokemon(generation, safePokemonId, pokemonStats);
 		for (const stat in pokemon.boosts) {
 			calcPokemon.boosts[stat] = pokemon.boosts[stat];
 		}
-		if (pokemon.status.toLowerCase().length !== 0) calcPokemon.status = pokemon.status.toLowerCase();
+		if (pokemon.status) calcPokemon.status = pokemon.status.toLowerCase();
 		const opposingId = (!move.isCrit && !!opponent.transformedId) ? opponent.transformedId : opponent.id;
-		const opposingPokemonStats = getTransformedStats(generation, opponent.id, opponent.level, opponent.transformedId, opponent.transformedLevel);
+		const opposingPokemonStats = getTransformedStats(generation, opponent.id, opponent.level, opponent.transformedId, opponent.transformedLevel, opponent.boosts, move.isCrit);
 		const opposingCalcPokemon = new calc.Pokemon(generation, opposingId, opposingPokemonStats);
 		for (const stat in opponent.boosts) {
 			opposingCalcPokemon.boosts[stat] = opponent.boosts[stat];
 		}
-		if (opponent.status.toLowerCase().length !== 0) opposingCalcPokemon.status = opponent.status.toLowerCase();
-		move.isCrit = isCrit != void 0 ? isCrit : critRate >= 1;
+		if (opponent.status) opposingCalcPokemon.status = opponent.status.toLowerCase();
+		move.isCrit = isCrit != undefined ? isCrit : critRate >= 1;
 		const fieldEffects = { defenderSide: { isReflect: opponent.hasReflect, isLightScreen: opponent.hasLightScreen } };
 		const calculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, fieldEffects);
-		const isHighCritRate = isCrit != void 0 ? isCrit : critRate > .2735
+		if (calculation == undefined) return;
+		const isHighCritRate = isCrit != undefined ? isCrit : critRate > .2735
 		let critCalculation;
 		if (isHighCritRate) {
 			move.isCrit = true;
 			critCalculation = getCalculation(generation, calcPokemon, opposingCalcPokemon, move, fieldEffects);
 			if (!Array.isArray(critCalculation.damage)) critCalculation.damage = [critCalculation.damage];
 		}
-		const opposingHealthRange = getHealthRange(opponent.healthRemainingPercent, calculation.defender.stats.hp);
+		const defenderHP = calculation.defender.stats.hp;
+		const opposingHealthRange = getHealthRange(opponent.healthRemainingPercent, defenderHP);
 
 		const floor = 1000;
 		if (Number.isNaN(calculation.damage) && !Array.isArray(calculation.damage)) return {};
@@ -439,10 +451,10 @@ window.roobyCalc = function() {
 		if (critRate > 0) damage.critRate = critRate;
 		for (const dmgKey of Object.keys(dmgs)) {
 			const dmg = dmgs[dmgKey];
-			damage[dmgKey + "Damage"] = Math.floor(dmg/calculation.defender.stats.hp*floor)/floor;
+			damage[dmgKey + "Damage"] = Math.floor(dmg/defenderHP*floor)/floor;
 	
-			if (move.recoil != void 0) {
-				const lowerDamage = dmg > calculation.defender.stats.hp ? calculation.defender.stats.hp : dmg;
+			if (move.recoil != undefined) {
+				const lowerDamage = dmg > defenderHP ? defenderHP : dmg;
 				damage[dmgKey + "Recoil"] = (lowerDamage * (move.recoil[0] / move.recoil[1]))/calculation.attacker.stats.hp;
 			}
 			switch (moveName) {
@@ -450,20 +462,20 @@ window.roobyCalc = function() {
 					damage[dmgKey + "Damage"] = calculation.attacker.rawStats.spe < calculation.defender.rawStats.spe ? 0 : 1;
 					break;
 				case "Super Fang":
-					damage[dmgKey + "Damage"] = pokemon.exactHealth != void 0 
+					damage[dmgKey + "Damage"] = pokemon.exactHealth != undefined 
 						? opponent.healthRemainingPercent/200 
-						: opposingHealthRange[dmgKey === "min" ? 0 : opposingHealthRange.length-1]/(2*calculation.defender.stats.hp);
+						: opposingHealthRange[dmgKey === "min" ? 0 : opposingHealthRange.length-1]/(2*defenderHP);
 					break;
 				case "Bide": case "Counter": case "Metronome": case "Mirror Move":
 					damage[dmgKey + "Damage"] = "?";
 					break;
 			}
 		}
-		const opponentHealth = (opponent.healthRemainingPercent/100)*calculation.defender.stats.hp;
+		const opponentHealth = (opponent.healthRemainingPercent/100)*defenderHP;
 		const hkoMultiple = dmgs.max > 0
 			? Math.ceil(opponentHealth/dmgs.max)
 			: null;
-		if (hkoMultiple != void 0 && hkoMultiple !== 0) {
+		if (hkoMultiple != undefined && hkoMultiple !== 0) {
 			if (hkoMultiple > 1000) {
 				damage.hkoMultiple = 1000;
 				damage.hkoPercentage = 0;
@@ -480,6 +492,52 @@ window.roobyCalc = function() {
 			}
 		};
 		return damage;
+	}
+	
+	const calculateWinRate = function (ratings, opponentRatings) {
+		const eloWinRate = calculateEloWinRate(ratings?.elo, opponentRatings?.elo);
+		const glickoWinRate = calculateGlickoWinRate(ratings?.rpr, ratings?.rprd, opponentRatings?.rpr, opponentRatings?.rprd);
+		const lowestDeviation = Math.min(ratings?.rprd || 0, opponentRatings?.rprd || 0);
+		const eloWeight = (Math.min(lowestDeviation, 125) - 25) / 200;
+		const glickoWeight = 1- eloWeight;
+		return isNaN(glickoWinRate) ? eloWinRate : (eloWinRate * eloWeight) + (glickoWinRate * glickoWeight);
+	}
+
+	const calculateGlickoWinRate = function (rating, ratingDeviation, opponentRating, opponentRatingDeviation) {
+		if (!rating || !ratingDeviation || !opponentRating || !opponentRatingDeviation) return;
+		const pi2 = 9.8696044;
+		const q = 0.00575646273;    
+		const rd = Math.sqrt(ratingDeviation * ratingDeviation + opponentRatingDeviation * opponentRatingDeviation);
+		const g = 1 / Math.sqrt(1 + 3 * q * q * rd * rd / pi2);
+		return 1 / (1 + Math.pow(10, -1 * g * (rating - opponentRating) / 400));
+	}
+
+	const calculateEloWinRate = function (rating, opponentRating) {
+		if (!rating || rating < 1000) rating = 1000;
+		if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
+		const eloWinRate = 1 / (1 + Math.pow(10, (opponentRating - rating) / 400));
+		return eloWinRate;
+	}
+
+	const calculateElo = function(rating, opponentRating, result) {
+		if (!rating || rating < 1000) rating = 1000;
+		if (!opponentRating || opponentRating < 1000) opponentRating = 1000;
+		let k = 50;
+		if (rating < 1100) {
+			if (result === -1) {
+				k = 20 + (rating - 1000)*30/100;
+			} else if (result === 1) {
+				k = 80 - (rating - 1000)*30/100;
+			}
+		} else if (rating > 1300) {
+			k = 40;
+		} else if (rating >= 1600) {
+			k = 32;
+		}
+		var winRate = calculateEloWinRate(rating, opponentRating);
+		let change = k * (((result + 1) / 2) - winRate);
+		if (rating + change < 1000) change = 1000 - rating;
+		return change;
 	}
 
 	const unrevealedMoves = function(pokemon, revealedMoves) {
@@ -510,7 +568,10 @@ window.roobyCalc = function() {
 	return {
 		buildSettingsPokemons,
 		buildTeamTree,
+		Elo: calculateElo,
 		damage,
-		unrevealedMoves
+		critRate: getCritRate,
+		unrevealedMoves,
+		winRate: calculateWinRate
 	}
 }();

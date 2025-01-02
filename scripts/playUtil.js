@@ -1,13 +1,13 @@
 
 const playUtil = function () {
     const buildSettingsP = function (labelText, labelName, labelClassName, options, selectedValue, event, attributes) {
-        const isSelect = attributes == void 0;
+        const isSelect = attributes == undefined;
         const isCheckbox = !isSelect && attributes.type === "checkbox";
         attributes = attributes || {};
         const p = document.createElement("p");
         const label = document.createElement("label");
         label.className = labelClassName;
-        if (!isCheckbox) label.innerHTML = labelText + ": ";
+        if (!isCheckbox) label.textContent = labelText + ": ";
         const input = isSelect ? document.createElement("select") : document.createElement("input");
         input.addEventListener("change", event);
         if (!isSelect) {
@@ -28,25 +28,25 @@ const playUtil = function () {
             const selectOptions = [];
             if (labelName !== "shiny") {
                 const defaultOption = document.createElement("option");
-                defaultOption.innerHTML = "Default";
+                defaultOption.textContent = "Default";
                 defaultOption.value = "0";
                 selectOptions.push(defaultOption);
             }
             const randomBattleOption = document.createElement("option");
-            randomBattleOption.innerHTML = "Random per battle";
+            randomBattleOption.textContent = "Random per battle";
             randomBattleOption.value = "1";
             selectOptions.push(randomBattleOption);
             const randomBattleNoCustomOption = document.createElement("option");
-            randomBattleNoCustomOption.innerHTML = "Random per battle (no customs)";
+            randomBattleNoCustomOption.textContent = "Random per battle (no customs)";
             randomBattleNoCustomOption.value = "2";
             selectOptions.push(randomBattleNoCustomOption);
             for (const optionObject of options) {
                 const option = document.createElement("option");
                 if (typeof optionObject === "string" || optionObject instanceof String) {
-                    option.innerHTML = optionObject;
+                    option.textContent = optionObject;
                 }
                 else {
-                    option.innerHTML = optionObject.text;
+                    option.textContent = optionObject.text;
                     option.value = optionObject.value;
                 }
                 selectOptions.push(option);
@@ -57,21 +57,68 @@ const playUtil = function () {
             }
             input.selectedIndex = optionIndex;
         }
-        label.appendChild(input);
         if (isCheckbox) {
-            label.innerHTML += " " + labelText;
+            label.textContent += " " + labelText;
+            label.prepend(input);
         }
+        else label.appendChild(input);
         p.appendChild(label);
         return p;
     }
 
+    function createElementWithOptions(elementOption) {
+        const keys = Object.keys(elementOption);
+        const tag = keys[0];
+        const element = document.createElement(tag);
+        element.textContent = elementOption[tag];
+        if (tag === "code") {
+            element.addEventListener("click", function () {
+                const room = element.closest(".ps-room");
+                const textarea = room.querySelector("form.chatbox").querySelector("textarea:not([aria-hidden])");
+                textarea.value = element.textContent;
+                textarea.setAttribute("data-value", element.textContent);
+                textarea.focus();
+            });
+        }
+        if (elementOption.properties) {
+            for (const propertyOption of elementOption.properties) {
+                const property = Object.keys(propertyOption)[0];
+                element.setAttribute(property, propertyOption[property]);
+            }
+        }
+        if (elementOption.children) {
+            for (const child of elementOption.children) {
+                const childElement = createElementWithOptions(child);
+                element.appendChild(childElement);
+            }
+        }
+        return element;
+    }
+
     const chatOutput = function (inputElement, message, className) {
         const chatBox = util.getNearestRelativeElement(inputElement, ".message-log");
+        if (chatBox == undefined) return;
         const div = document.createElement("div");
         const classNames = ["rooby-chat"];
-        if (className != void 0) classNames.push(className);
+        if (className != undefined) classNames.push(className);
+        else classNames.push("infobox");
         div.classList.add(...classNames);
-        div.innerHTML = message;
+        if (typeof message === "string" || message instanceof String) {
+            div.textContent = message;
+        }
+        else {
+            for (const group of message) {
+                const wrapper = document.createElement("div");
+                for (const elementOption of group) {
+                    const tag = Object.keys(elementOption)[0];
+                    const element = tag === "text"
+                        ? document.createTextNode(elementOption[tag])
+                        : createElementWithOptions(elementOption);
+                    wrapper.appendChild(element);
+                }
+                div.appendChild(wrapper);
+            }
+        }
         chatBox.appendChild(div);
         const scrollDiv = document.createElement("div");
         div.after(scrollDiv)
@@ -96,6 +143,46 @@ const playUtil = function () {
         img.setAttribute(attribute, prefix + url + postfix);
     }
 
+    const uploadReplay = function (tabId) {
+        window.postMessage({
+            function: "uploadReplay",
+            args: {
+                tab: tabId
+            }
+        });
+    }
+
+    const challenge = function (room, opponent, format, command, roobyId) {
+        if (command) format.command = command;
+        window.postMessage({
+            function: "challenge",
+            args: {
+                tab: room,
+                opponent: opponent,
+                format: format,
+                roobyId: roobyId
+            }
+        });
+    }
+
+    const joinRoom = function (room) {
+        if (room) window.postMessage({
+            function: "joinRoom",
+            args: {
+                id: room
+            }
+        });
+    }
+
+    const notify = function (message) {
+        window.postMessage({
+            function: "notify",
+            args: {
+                message: message
+            }
+        });
+    }
+
     const changeAvatar = function (name, animateTrainer) {
         setTimeout(function() {
             const pmLogs = Array.from(document.querySelectorAll(".pm-log"));
@@ -108,7 +195,6 @@ const playUtil = function () {
                 }
             }
         }, 1000);
-        console.log(name);
         window.postMessage({
             function: "changeAvatar",
             args: {
@@ -120,7 +206,7 @@ const playUtil = function () {
     const getActivePokemonId = function (trainerElement) {
         const labelSpan = Array.from(trainerElement.querySelectorAll(".picon.has-tooltip"))
             .find(span => span.getAttribute("aria-label").endsWith("(active)"));
-        if (labelSpan == void 0) return;
+        if (labelSpan == undefined) return;
         const activeIconNameWithoutNick = labelSpan.getAttribute("aria-label").substring(0, labelSpan.getAttribute("aria-label").lastIndexOf(" ("));
         const name = activeIconNameWithoutNick.indexOf("(") !== -1
             ? activeIconNameWithoutNick.substring(activeIconNameWithoutNick.lastIndexOf(" (") + 2, activeIconNameWithoutNick.length - 1)
@@ -134,13 +220,13 @@ const playUtil = function () {
     }
 
     const getIsTransformedByStatElement = function (trainerStatElement) {
-        if (trainerStatElement == void 0) return false;
+        if (trainerStatElement == undefined) return false;
         return Array.from(trainerStatElement.querySelectorAll("span")).some(e => e.innerText === "Transformed");
     }
 
     const getLevelFromStatElement = function (statElement) {
         const levelSmall = Array.from(statElement.querySelectorAll("small")).find(s => s.innerHTML.charAt(0) === "L");
-        return levelSmall != void 0 && levelSmall.innerHTML != void 0
+        return levelSmall != undefined && levelSmall.innerHTML != undefined
             ? Number.parseInt(levelSmall.innerHTML.substring(1))
             : 100;
     }
@@ -149,6 +235,84 @@ const playUtil = function () {
         return page === "play"
             ? element.closest(".ps-room-opaque")
             : document.querySelector(".battle").parentElement;
+    }
+
+    const getAttackMultiplier = function (roomElement, isRight, maxIndex) {
+        if (isRight == undefined) isRight = false;
+        const battleLog = roomElement.querySelector(".battle-log");
+        if (battleLog == undefined) return;
+        let attack = 1;
+        let boosts = 0;
+        const rightTrainerElement = playUtil.getTrainerElementBySide(roomElement, maxIndex == undefined ? true : isRight);
+        const rightTrainerName = playUtil.getTrainerNameByElement(rightTrainerElement, false);
+        const battleHistories = Array.from(battleLog.querySelectorAll(".battle-history"));
+        if (maxIndex != undefined) battleHistories.splice(maxIndex, battleHistories.length - maxIndex);
+        let lastSwitch = battleHistories.findLastIndex(e => e.textContent.startsWith("Go! ") && e.textContent.endsWith("!") && e.querySelector("strong"));
+        let lastOpponentSwitch = battleHistories.findLastIndex(e => e.textContent.startsWith(rightTrainerName + " sent out ") && e.textContent.endsWith("!") && e.querySelector("strong"));
+        if (isRight) {
+            const temp = lastSwitch;
+            lastSwitch = lastOpponentSwitch;
+            lastOpponentSwitch = temp;
+        }
+        let burned = false;
+        for (let i = Math.min(lastSwitch, lastOpponentSwitch); i < battleHistories.length; i++) {
+            const battleHistory = battleHistories[i];
+            const text = battleHistory.textContent;
+            const correctSide = isRight ? text.startsWith("The opposing ") : !text.startsWith("The opposing ");
+            if (i === lastSwitch) {
+                attack = 1;
+                boosts = 0;
+                burned = false;
+            }
+            else if (text.endsWith("!") && text.indexOf(" used ") !== -1 && battleHistory.querySelector("strong")) {
+                const move = text.substring(text.indexOf(" used ") + 6, text.lastIndexOf("!"));
+                if (!correctSide) {
+                    const boostingMoves = Object.keys(consts.moves).filter(m => !!consts.moves[m].boosts);
+                    if (burned && boostingMoves.find(bm => consts.moves[bm].name === move)) {
+                        attack = attack / 2;
+                    }
+                }
+            }
+            else if (correctSide) {
+                if (battleHistory.querySelector("small")) {
+                    if (text.endsWith(" was burned!")) {
+                        burned = true;
+                        attack = attack / 2;
+                    }
+                    else if (text.endsWith(" was hurt by its burn!")) {
+                        burned = true;
+                    }
+                    else if (text.endsWith(" slept and became healthy!")) {
+                        burned = false;
+                    }
+                    else if (text.endsWith("All STATUS changes are eliminated!")) {
+                        attack = 1;
+                        boosts = 0;
+                    }
+                    else if (text.endsWith(" Attack rose!") || text.endsWith(" Attack rose sharply!")) {
+                        boosts = boosts + (text.endsWith(" sharply!") ? 2 : 1);
+                        attack = boosts > 0 ? (boosts + 2) / 2 : 2 / (2 - boosts);
+                    }
+                    else if (text.endsWith(" Attack fell!")) {
+                        boosts = boosts - 1;
+                        attack = boosts > 0 ? (boosts + 2) / 2 : 2 / (2 - boosts);
+                    }
+                }
+                else if (text.indexOf(" transformed into ") !== -1 && maxIndex == undefined) {
+                    const transformedAttack = getAttackMultiplier(roomElement, !isRight, i);
+                    if (transformedAttack != undefined) {
+                        attack = transformedAttack;
+                        burned = true;
+                    }
+                }
+            }
+            else if (text.endsWith("All STATUS changes are eliminated!")) {
+                burned = false;
+                attack = 1;
+                boosts = 0;
+            }
+        }
+        return burned ? attack : null;
     }
 
     const getPokemonHealth = function (healthElement, statElement) {
@@ -180,8 +344,8 @@ const playUtil = function () {
         const possibleNickedNameElementHtmls = Array.from(h2.querySelectorAll("small"))
             .filter(s => s.innerHTML.startsWith("(") && s.innerHTML.endsWith(")"))
             .map(e => e.innerHTML.substring(1, e.innerHTML.length - 1));
-        const nickedPokemon = possibleNickedNameElementHtmls.map(h => pokemons.find(p => p.name === h)).find(p => p != void 0);
-        const tooltipPokemonName = nickedPokemon != void 0
+        const nickedPokemon = possibleNickedNameElementHtmls.map(h => pokemons.find(p => p.name === h)).find(p => p != undefined);
+        const tooltipPokemonName = nickedPokemon != undefined
             ? nickedPokemon.name
             : h2.childNodes[0].nodeValue.trim();
         return tooltipPokemonName;
@@ -190,7 +354,7 @@ const playUtil = function () {
     const getPokemonIdByName = function (pokemonName) {
         const pokedexMons = Object.keys(consts.pokedex).map(k => { const dexEntry = consts.pokedex[k]; dexEntry.id = k; return dexEntry; });
         const pokemon = pokedexMons.find(p => p.name === pokemonName);
-        return pokemon != void 0 ? pokemon.id : null;
+        return pokemon != undefined ? pokemon.id : null;
     }
 
     const getPokemonLevelById = function (levels, timeoutIds, tab, trainerName, pokemonId, isRight) {
@@ -199,13 +363,13 @@ const playUtil = function () {
             if (!!levels[tab] && !!levels[tab][trainerName] && !!levels[tab][trainerName][pokemonId]) {
                 return levels[tab][trainerName][pokemonId];
             }
-            else if (!!levels[tab] && !!levels[tab][trainerName] && pokemonId == void 0) {
+            else if (!!levels[tab] && !!levels[tab][trainerName] && pokemonId == undefined) {
                 return levels[tab][trainerName];
             }
-            else if (!!levels[tab] && trainerName == void 0 && pokemonId == void 0) {
+            else if (!!levels[tab] && trainerName == undefined && pokemonId == undefined) {
                 return levels[tab];
             }
-            else if (tab == void 0 && trainerName == void 0 && pokemonId == void 0) {
+            else if (tab == undefined && trainerName == undefined && pokemonId == undefined) {
                 return levels;
             }
         }
@@ -221,7 +385,7 @@ const playUtil = function () {
             });
         }, 20, timeoutIds[tab][trainerName]);
         const level = getLevels(levels, tab, trainerName, pokemonId);
-        if (level != void 0) return level;
+        if (level != undefined) return level;
     }
 
     const getRevealedPokemonIds = function (trainerElement) {
@@ -274,7 +438,7 @@ const playUtil = function () {
         const lastTransformEntry = getIsRightByChildElement(trainerElement)
             ? transformEntries.findLast(e => e.startsWith("The opposing"))
             : transformEntries.findLast(e => !e.startsWith("The opposing"));
-        if (lastTransformEntry != void 0) {
+        if (lastTransformEntry != undefined) {
             const transformedIntoName = lastTransformEntry.substring(lastTransformEntry.indexOf("transformed into") + 17, lastTransformEntry.length - 2);
             const pokemonId = playUtil.getPokemonIdByName(transformedIntoName);
             return pokemonId;
@@ -287,7 +451,9 @@ const playUtil = function () {
         buildSettingsP,
         chatOutput,
         changeAvatar,
+        challenge,
         getActivePokemonId,
+        getAttackMultiplier,
         getIsRightByChildElement,
         getIsTransformedByStatElement,
         getLevelFromStatElement,
@@ -303,6 +469,9 @@ const playUtil = function () {
         getTrainerElementBySide,
         getTrainerNameByElement,
         getTransformedId,
-        getStatElementBySide
+        getStatElementBySide,
+        joinRoom,
+        notify,
+        uploadReplay
     }
 }();

@@ -3,7 +3,7 @@ window.util = function() {
 	const BattleTooltips = function() {
 		function BattleTooltips(battle) {
 			const _this = this;
-			this.battle = void 0;
+			this.battle = undefined;
 			this.clickTooltipEvent = function(e) {
 				if (BattleTooltips.isLocked) {
 					e.preventDefault();
@@ -74,7 +74,7 @@ window.util = function() {
 			if (hoveredElem) {
 				elem = hoveredElem;
 			} else {
-				if (this.battle == void 0) return;
+				if (this.battle == undefined) return;
 				elem = this.battle.scene.$turn[0];
 				notRelativeToParent = true;
 			}
@@ -87,7 +87,7 @@ window.util = function() {
 			let x = Math.max(hoveredX1 - 2, 0);
 			let y = Math.max(hoveredY1 - 5, 0);
 			let wrapper = document.querySelector("#tooltipwrapper");
-			if (wrapper == void 0) {
+			if (wrapper == undefined) {
 				wrapper = document.createElement("div");
 				wrapper.id = "tooltipwrapper";
 				wrapper.setAttribute("role", "tooltip");
@@ -104,7 +104,7 @@ window.util = function() {
 			}
 			wrapper.style.left = x + "px";
 			wrapper.style.top = y + "px";
-			if (htmlElement != void 0) {
+			if (htmlElement != undefined) {
 				const tooltipInnerDiv = document.createElement('div');
 				tooltipInnerDiv.className = 'tooltipinner';
 				const tooltipDiv = document.createElement('div');
@@ -135,7 +135,7 @@ window.util = function() {
 				x = document.documentElement.clientWidth - width - 2;
 				wrapper.style.left = x + "px";
 			}
-			if (dataAttributes != void 0) {
+			if (dataAttributes != undefined) {
 				for (const key in dataAttributes) {
 					BattleTooltips.elem.setAttribute("data-" + key, dataAttributes[key]);
 				}
@@ -162,7 +162,9 @@ window.util = function() {
 			.reduce( (res, key) => (res[key] = obj[key], res), {} );
 	}
 
-	const getMostSimilarString = function(pokemonName, pokemonNames) {
+	const getMostSimilarString = function(pokemonName, pokemonNames, maxDistance) {
+		if (pokemonName === "mrmime") pokemonName = "mr.mime";
+		if (maxDistance == undefined) maxDistance = Infinity;
 		const levenshteinDistance = (str1 = '', str2 = '') => {
 			const track = Array(str2.length + 1).fill(null).map(() =>
 			Array(str1.length + 1).fill(null));
@@ -184,6 +186,21 @@ window.util = function() {
 			}
 			return track[str2.length][str1.length];
 		};
+		const distanceCalc = function(str1, str2) {
+			let secondString = str2.slice().toLowerCase();
+			let firstString = str1.slice().toLowerCase();
+			let distance = firstString.length;
+			for (let i = 0; i < firstString.length; i++) {
+				for (let j = 0; j < secondString.length; j++) {
+					if (firstString[i] === secondString[j]) {
+						secondString = secondString.slice(0, j) + secondString.slice(j + 1);
+						distance--;
+						break;
+					}
+				}
+			}
+			return distance;
+		}
 		let mostSimilarString;
 		let shortestDistance = Infinity;
 		for (const secondName of pokemonNames) {
@@ -192,6 +209,20 @@ window.util = function() {
 				mostSimilarString = secondName;
 				shortestDistance = distance;
 			}
+			else if (distance == shortestDistance) {
+				const mostSimilarDistance1 = distanceCalc(pokemonName, mostSimilarString);
+				const mostSimilarDistance2 = distanceCalc(mostSimilarString, pokemonName);
+				const mostSimilarDistance = Math.min(mostSimilarDistance1, mostSimilarDistance2);
+				const secondDistance1 = distanceCalc(pokemonName, secondName);
+				const secondDistance2 = distanceCalc(secondName, pokemonName);
+				const secondDistance = Math.min(secondDistance1, secondDistance2);
+				if (secondDistance < mostSimilarDistance) {
+					mostSimilarString = secondName;
+				}
+			}
+		}
+		if (shortestDistance > maxDistance) {
+			return null;
 		}
 		return mostSimilarString;
 	}
@@ -199,7 +230,7 @@ window.util = function() {
 	const getNearestRelativeElement = function(element, selector) {
 		while(element.parentNode && element.nodeName.toLowerCase() != 'body') {
 			const relative = element.querySelector(selector);
-			if (relative != void 0) {
+			if (relative != undefined) {
 				return relative;
 			}
 			element = element.parentNode;
@@ -233,7 +264,7 @@ window.util = function() {
 		const initialSeed = hashCode(seed);
 		let array = [];
 		const prng = splitmix32(initialSeed);
-		if (lengths == void 0) return prng();
+		if (lengths == undefined) return prng();
 		for (let i = 0; i < lengths.length; i++) {
 			const length = lengths[i];
 			const rangedRandom = Math.floor(prng() * length);
@@ -253,6 +284,36 @@ window.util = function() {
 		return safeId;
 	}
 
+	const getRooBYFormats = function() {
+		return fetch("https://datumlocker.com/rooby/formats.json?timestamp=" + new Date().getTime())
+			.then(response => response.json())
+	}
+
+	const reportRooBYLadder = function(id, link, status) {
+		let fetchString = "https://datumlocker.com/rooby/report.php?timestamp=" + new Date().getTime();
+		if (id) fetchString += "&id=" + id;
+		if (link) fetchString += "&link=" + link;
+		if (status) fetchString += "&status=" + status;
+		return fetch(fetchString).then(response => response.json())
+	}
+
+	const requestRooBYLadder = function(username, format, id, cancel) {
+		let fetchString = "https://datumlocker.com/rooby/request.php?username=" + username + "&format=" + format + "&timestamp=" + new Date().getTime();
+		if (id) fetchString += "&id=" + id;
+		if (cancel) fetchString += "&cancel=true";
+		return fetch(fetchString).then(response => response.json())
+	}
+
+	const loadRooBYLadderData = function() {
+		return fetch("https://datumlocker.com/rooby/ladder.json?timestamp=" + new Date().getTime())
+			.then(response => response.json())
+	}
+
+	const loadRooBYLeaderboardData = function() {
+		return fetch("https://datumlocker.com/rooby/leaderboard.json?timestamp=" + new Date().getTime())
+			.then(response => response.json())
+	}
+
 	const loadLadderData = function(format, url) {
 		return fetch(url + format + ".json")
 			.then(response => response.json())
@@ -264,8 +325,13 @@ window.util = function() {
 	}
 
 	const loadRatingsData = function(name, url) {
-		return fetch(url + name + ".json")
-			.then(response => response.json());
+		try {
+			return fetch(url + name + ".json")
+				.then(response => response.json());
+		}
+		catch (error) {
+			return;
+		}
 	}
 	
 	const pruneCalculations = function(pokemons) {
@@ -275,7 +341,7 @@ window.util = function() {
 			const trainers = room.querySelectorAll(".trainer");
 			for (const trainer of trainers) {
 				const revealedPokemonNames = Array.from(trainer.querySelectorAll(".teamicons")).map(node => Array.from(node.querySelectorAll(".has-tooltip"))).flat().map(node => node.getAttribute("aria-label").split("(")[0].trim()).slice(0, 5);
-				let revealedPokemonNumbers = revealedPokemonNames.map(rpn => pokemons.find(p => p.name === rpn)).filter(p => p !== void 0).map(p => p.number).slice(0,3);
+				let revealedPokemonNumbers = revealedPokemonNames.map(rpn => pokemons.find(p => p.name === rpn)).filter(p => p !== undefined).map(p => p.number).slice(0,3);
 				saveMonNumbers.push(revealedPokemonNumbers);
 			}
 		}
@@ -294,17 +360,17 @@ window.util = function() {
 
 	const getStorage = async function(key) {
 		const result = await api.storage.local.get(key);
-		if (result == void 0 && key === "settings") return consts.defaultSettings;
+		if (result == undefined && key === "settings") return consts.defaultSettings;
 		return key != null ? result[key] : result;
 	}
 
 	const saveStorage = async function(key, subkey, value) {
-		if (value == void 0) {
+		if (value == undefined) {
 			value = subkey;
-			subkey = void 0;
+			subkey = undefined;
 		}
 		let storage = await getStorage(key) ?? {};
-		if (subkey != void 0) {
+		if (subkey != undefined) {
 			storage[subkey] = value;
 		}
 		else storage[key] = value;
@@ -329,15 +395,20 @@ window.util = function() {
 		capitalizeFirstLetter,
 		debounce,
 		filterObject,
+		getRooBYFormats,
 		getStorage,
 		getMostSimilarString,
 		loadLadderData,
 		loadRandomsData,
 		loadRatingsData,
+		loadRooBYLadderData,
+		loadRooBYLeaderboardData,
 		getNearestRelativeElement,
 		pruneCalculations,
 		randomNumbersGenerator,
 		replaceIdWithSafeId,
+		reportRooBYLadder,
+		requestRooBYLadder,
 		saveStorage,
 		slugify
 	}

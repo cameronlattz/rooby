@@ -69,10 +69,39 @@ body .movemenu button.recovery-failure small {
 .innerbattle > .message {
     z-index: 2;
 }
-.rooby-chat-info {
-    border: 1px solid gray;
-    background-color: rgba(0, 0, 0, 0.1);
-    padding: 3px;
+.rooby-chat code {
+    cursor: pointer;
+}
+div.rooby-menu {
+    background: rgba(242,247,250,.85);
+    max-height: 200px;
+    overflow-y: auto;
+    position: relative;
+}
+.rooby-menu:not(:has(a:not([style="display: none;"]))) {
+    display: none;
+}
+.rooby-menu small:nth-of-type(3) {
+    margin: 0px 5px;
+}
+div.rooby-menu > p {
+    text-shadow: none;
+    color: black;
+    margin: 3px 0px;
+}
+.rooby-menu img {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 0px;
+    height: 100%;
+    z-index: -1;
+}
+.rooby-menu > div {
+    text-align: left;
+}
+.rooby-menu .vs {
+    padding: 0px 5px;
 }
 .failure:not(.p0) {
     color: #f00;
@@ -140,6 +169,11 @@ div#backdropBottom.other-gen-backdrop {
 #backdropBottom:not(.old-gen-backdrop):not(.mid-gen-backdrop):not(.old-gen):not(.mid-gen) ~ div[role="complementary"] .trainer-far,
 #backdropBottom.other-gen-backdrop ~ div[role="complementary"] .trainer-far {
     top: 0;
+    bottom: unset;
+}
+#backdropBottom:not(.other-gen-backdrop):not(.mid-gen-backdrop):not(.other-gen):not(.mid-gen) ~ div[role="complementary"] .trainer-far,
+#backdropBottom.old-gen-backdrop ~ div[role="complementary"] .trainer-far {
+    top: 38px;
     bottom: unset;
 }
 #backdropBottom.mid-gen-backdrop.old-gen ~ .backdrop ~ div:not([class]) > div:last-child > img  {

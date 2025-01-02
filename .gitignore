@@ -4,3 +4,4 @@ eslint.config.mjs
 package-lock.json
 package.json
 rooby.zip
+webext.bat

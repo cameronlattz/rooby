@@ -1,17 +1,61 @@
 (function() {
     window.addEventListener("message", (event) => {
         if (event.origin !== "https://play.pokemonshowdown.com" && event.origin !== "https://replay.pokemonshowdown.com") return;
-        if (event.data.function != void 0 && !event.data.function.endsWith("Return")) {
+        if (event.data.function != undefined && !event.data.function.endsWith("Return")) {
             const room = Object.keys(window.app.rooms).map(key => window.app.rooms[key]).find(r => r.id.endsWith(event.data.args.tab));
             event.data.args = runFunc(event.data.function, room, event.data.args);
-            if (event.data.args == void 0) return;
+            if (event.data.args == undefined) return;
             event.data.function = event.data.function + "Return";
             event.source.postMessage(event.data, event.origin);
         }
     });
 
-    const runFunc = function(functionName, rooms, args) {
-        return eval(functionName)(rooms, args);
+    const runFunc = function(functionName, room, args) {
+        switch (functionName) {
+            case "challenge":
+                return challenge(room, args);
+            case "changeAvatar":
+                return changeAvatar(room, args);
+            case "getPokemonLevels":
+                return getPokemonLevels(room, args);
+            case "getPokemonStatsByName":
+                return getPokemonStatsByName(room, args);
+            case "exportTeams":
+                return exportTeams(room, args);
+            case "getExactHealthByName":
+                return getExactHealthByName(room, args);
+            case "joinRoom":
+                return joinRoom(room, args);
+            case "notify":
+                return notify(room, args);
+            case "uploadReplay":
+                return uploadReplay(room, args);
+            default:
+                return;
+        }
+    }
+
+    this.uploadReplay = function(room, args) {
+        room.send("/savereplay");
+    }
+
+    this.joinRoom = function(room, args) {
+        window.app.joinRoom(args.id);
+    }
+
+    this.notify = function(room, args) {
+        window.app.addPopupMessage(args.message);
+    }
+
+    this.challenge = function(room, args) {
+        app.rooms[""].challenge(args.opponent, args.format.command);
+        const pmWindow = document.querySelector(".pm-window[data-userid='" + args.opponent + "']");
+        const log = pmWindow.querySelector("div[role='log']");
+        const hiddenMessage = document.createElement("input");
+        hiddenMessage.type = "hidden";
+        hiddenMessage.className = "rooby-id";
+        hiddenMessage.value = args.roobyId;
+        log.appendChild(hiddenMessage);
     }
 
     this.changeAvatar = function(room, args) {
@@ -20,8 +64,8 @@
 
     this.getExactHealthByName = function(room, args) {
         const pokemon = getPokemonFromData(room, args.isRight, args.name);
-        if (pokemon == void 0) return;
-        const hasExactStats = room.battle.myPokemon != void 0;
+        if (pokemon == undefined) return;
+        const hasExactStats = room.battle.myPokemon != undefined;
         const myPokemon = hasExactStats ? room.battle.myPokemon.find(p => p.name === args.name) : null;
         const healthRemainingPercent = hasExactStats ? myPokemon.hp / myPokemon.maxhp * 100 : pokemon.hp;
         if (args.healthRemainingPercent != Math.ceil(healthRemainingPercent)) return;
@@ -42,15 +86,15 @@
 
     this.getPokemonStatsByName = function(room, args) {
         const pokemon = getPokemonFromData(room, args.isRight, args.name);
-        if (pokemon == void 0) return;
+        if (pokemon == undefined) return;
         args.level = pokemon.level;
-        if (pokemon.volatiles["transform"] != void 0 && !ignoreTransform) {
+        if (pokemon.volatiles["transform"] != undefined && !ignoreTransform) {
             args.transformed = {
                 name: pokemon.volatiles["transform"][1].name,
                 level: pokemon.volatiles["transform"][1].level
             };
         }
-        const myPokemon = room.battle.myPokemon != void 0 ? room.battle.myPokemon.find(p => p.name === args.pokemonName) : null;
+        const myPokemon = room.battle.myPokemon != undefined ? room.battle.myPokemon.find(p => p.name === args.pokemonName) : null;
         const hasExactHealth = myPokemon && !args.isRight;
         args.healthRemainingPercent = hasExactHealth ? myPokemon.hp / myPokemon.maxhp * 100 : pokemon.hp;
         args.exactHealth = hasExactHealth ? myPokemon.hp : null;
@@ -76,7 +120,7 @@
 
     const getPokemonFromData = function(room, isRight, pokemonName) {
         const side = room.battle[isRight ? "farSide" : "nearSide"];
-        const pokemon = pokemonName != void 0
+        const pokemon = pokemonName != undefined
             ? side.pokemon.find(p => p.name === pokemonName)
             : side.pokemon;
         return pokemon;

@@ -4,24 +4,24 @@
     const {onMessage} = api.runtime, {addListener} = onMessage; 
     onMessage.addListener = fn => addListener.call(onMessage, (msg, sender, respond) => {
         const res = fn(msg, sender, respond);
-        if (res instanceof Promise) return !!res.then(respond, void 0);
+        if (res instanceof Promise) return !!res.then(respond, undefined);
         if (res !== undefined) respond(res);
     });
     onMessage.addListener(
         async function(request, sender, sendResponse) {
             if (request.args != null) {
-                if (request.function !== "init" && _pokemons == void 0 && request.args.pokemons != void 0) {
+                if (request.function !== "init" && _pokemons == undefined && request.args.pokemons != undefined) {
                     await init(request.args.pokemons);
                 }
                 if (request.function === "calculate" && request.args.currentTeamNumbers !== null && request.args.currentTeamNumbers.length < consts.maxTeamSize) {
                     const odds = await getOdds(request.args, "types", true);
-                    const opponentHasDitto = (request.args.opponentPokemonNumbers != void 0 && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
+                    const opponentHasDitto = (request.args.opponentPokemonNumbers != undefined && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
                     const dittoCurrentTeamNumbers = request.args.currentTeamNumbers + (opponentHasDitto ? "DITTO" : "");
                     sendResponse({currentTeamNumbers: dittoCurrentTeamNumbers, odds: odds});
                 }
                 else if (request.function === "simulate" && request.args.currentTeamNumbers !== null) {
                     const odds = await getOdds(request.args, request.args.type, false);
-                    const opponentHasDitto = (request.args.opponentPokemonNumbers != void 0 && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
+                    const opponentHasDitto = (request.args.opponentPokemonNumbers != undefined && request.args.opponentPokemonNumbers.includes(_dittoNumber)) || request.args.opponentHasDitto === true;
                     const dittoCurrentTeamNumbers = request.args.currentTeamNumbers + (opponentHasDitto ? "DITTO" : "");
                     sendResponse({currentTeamNumbers: dittoCurrentTeamNumbers, odds: odds, simulations: request.args.simulations});
                 }
@@ -103,19 +103,19 @@
 
     const getStorage = async (storageKey, key) => {
         let result = await api.storage.local.get([storageKey]);
-        if (key == void 0) result = result[storageKey];
-        else if (result[storageKey] != void 0) result = result[storageKey][key];
+        if (key == undefined) result = result[storageKey];
+        else if (result[storageKey] != undefined) result = result[storageKey][key];
         return result;
     }
 
     const saveStorage = async function(storageKey, arg1, arg2) {
-        if (storageKey == void 0 || arg1 == void 0) return false;
+        if (storageKey == undefined || arg1 == undefined) return false;
         let storageValues = await getStorage(storageKey);
-        if (arg2 == void 0) {
+        if (arg2 == undefined) {
             storageValues = arg1;
         }
         else {
-            if (storageValues == void 0) storageValues = {};
+            if (storageValues == undefined) storageValues = {};
             storageValues[arg1] = arg2;
         }
         await api.storage.local.set({[storageKey]: storageValues});
@@ -129,7 +129,7 @@
         const currentTime = Date.now();
         const storedOrSaveMonNumbers = saveMonNumbers.length !== 0
             ? storedOddsMonNumbers.filter(m => saveMons.includes(m))
-            : storedOddsMonNumbers.filter(m => allStoredOdds[m].time != void 0 && allStoredOdds[m].time > currentTime - 7200000);
+            : storedOddsMonNumbers.filter(m => allStoredOdds[m].time != undefined && allStoredOdds[m].time > currentTime - 7200000);
         const newStoredOdds = {};
         for (const monNumbers of storedOrSaveMonNumbers) {
             newStoredOdds[monNumbers] = allStoredOdds[monNumbers];
@@ -148,7 +148,7 @@
     }
 
     const getStoredOdds = async function(monNumbers) {
-        if (_odds[monNumbers] != void 0) {
+        if (_odds[monNumbers] != undefined) {
             return _odds[monNumbers];
         }
         const timedOdds = await getStorage("odds", monNumbers);
@@ -157,7 +157,7 @@
 
     const saveStoredOdds = async function(monNumbers, odds) {
         const allOdds = await api.storage.local.get(["odds"]);
-        if (allOdds == void 0) {
+        if (allOdds == undefined) {
             return;
         }
         await saveStorage("odds", monNumbers, {time: Date.now(), odds: odds});
@@ -185,7 +185,7 @@
     }
 
     const cloneTree = function(tree) {
-        if (tree == void 0) return tree;
+        if (tree == undefined) return tree;
         const clone = (tree) => tree.map(branch => Array.isArray(branch) ? clone(branch) : branch);
         return clone(tree);
     }
@@ -236,15 +236,15 @@
         const opponentHasDitto = ((args.opponentPokemonNumbers || []).includes(_dittoNumber) || args.hiddenDitto === true) && !currentTeamNumbers.includes(_dittoNumber);
         const storedOddsKey = monNumbers + (opponentHasDitto ? "DITTO" : "");
         let odds = doSave ? await getStoredOdds(storedOddsKey) : {};
-        if (odds == void 0 || Object.keys(odds).length === 0 && !_lockedNumbers.includes(currentTeamNumbers)) {
-            if (currentTeamNumbers.length >= 5 && args.simulations == void 0) {
+        if (odds == undefined || Object.keys(odds).length === 0 && !_lockedNumbers.includes(currentTeamNumbers)) {
+            if (currentTeamNumbers.length >= 5 && args.simulations == undefined) {
                 const first3MonNumbers = first3TeamMembers.join(",") + (opponentHasDitto ? "DITTO" : "");
                 let tree = getTree(first3MonNumbers);
-                const noTree = tree == void 0;
+                const noTree = tree == undefined;
                 _lockedNumbers.push(storedOddsKey);
                 if (noTree) {
                     tree = await buildTeamTree(first3TeamMembers, opponentHasDitto);
-                    if (tree == void 0) return false;
+                    if (tree == undefined) return false;
                     if (doSave) saveTree(first3MonNumbers, tree);
                     odds = await buildOdds(tree, type);
                     if (currentTeamNumbers.length !== 3) _odds[first3MonNumbers] = odds;
@@ -275,7 +275,7 @@
     const buildOdds = async function(treeOrSimulationCount, type, currentTeamNumbers, opponentHasDitto) {
         const odds = {};
         const pokemons = await getPokemons();
-        if (pokemons == void 0) return;
+        if (pokemons == undefined) return;
         if (type === "pokemon") {
             for (const pokemon of pokemons) {
                 odds[pokemon.name] = 0;
@@ -367,7 +367,7 @@
                     species = pokemonPool[randomIndex];
                     delete pokemonPool[randomIndex];
                 }
-                if (species == void 0) continue;
+                if (species == undefined) continue;
         
                 if (species.id === 'ditto' && hasDitto) continue;
         
@@ -429,7 +429,7 @@
         
             while (pokemon.length < consts.maxTeamSize && rejectedButNotInvalidPool.length) {
                 const speciesNumber = rejectedButNotInvalidPool[rejectedRandomIndex];
-                if (speciesNumber == void 0) continue;
+                if (speciesNumber == undefined) continue;
                 delete pokemonPool[randomIndex];
                 pokemon.push(speciesNumber);
             }
@@ -462,14 +462,14 @@
             for (const pokemonNumber of team) {
                 const pokemonName = _pokemonNameByNumber[pokemonNumber];
                 teamTotal[pokemonName] = 1;
-                if (uniquePokemonNumbers != void 0 && !uniquePokemonNumbers.includes(pokemonNumber)) {
+                if (uniquePokemonNumbers != undefined && !uniquePokemonNumbers.includes(pokemonNumber)) {
                     uniquePokemonNumbers.push(pokemonNumber);
                 }
             }
         }
         else {
             for (const pokemonNumber of team) {
-                if (uniquePokemonNumbers != void 0 && !uniquePokemonNumbers.includes(pokemonNumber)) {
+                if (uniquePokemonNumbers != undefined && !uniquePokemonNumbers.includes(pokemonNumber)) {
                     uniquePokemonNumbers.push(pokemonNumber);
                 }
                 const types = _pokemonTypesByNumber[pokemonNumber];

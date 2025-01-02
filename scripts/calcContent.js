@@ -8,7 +8,7 @@
 
     const elementInserted = function(e) {
         if (getGen() != 1) return;
-        if (e.nodeName === "#text" && e.data != void 0 && e.parentElement != void 0) {
+        if (e.nodeName === "#text" && e.data != undefined && e.parentElement != undefined) {
             if (e.parentElement.closest(".select2-chosen")) {
                 if (!e.parentElement.closest(".set-selector")) return;
                 const classLetter = e.parentNode.closest("fieldset").id === "p1" ? "L" : "R";
@@ -32,18 +32,25 @@
                 const moveIndex = forAttribute.substring(forAttribute.length - 1);
                 const moveContainer = document.querySelector(selector + " .move" + moveIndex);
                 const isCrit = moveContainer.querySelector(".move-crit").checked;
-                const result = calculateDamage(moveContainer, isRight, isCrit);
+                const moveName = moveContainer.querySelector("select.move-selector").value;
+                const fieldSet = moveContainer.closest("fieldset.poke-info");
+                const pokemonName = fieldSet.querySelector(".select2-chosen").textContent.split("(")[0];
+                const pokedexNames = Object.keys(consts.pokedex).map(p => consts.pokedex[p].name);
+                const cleanPokemonName = util.getMostSimilarString(pokemonName, pokedexNames);
+                const pokemonId = Object.keys(consts.pokedex).find(p => consts.pokedex[p].name === cleanPokemonName);
+                const moveCritRate = roobyCalc.critRate(pokemonId, moveName);
+                const result = calculateDamage(moveContainer, isRight, isCrit || moveCritRate >= 1);
                 const textNode = e.parentNode.parentNode.querySelector("span").childNodes[0];
                 const mainSpan = e.parentElement.closest("body").querySelector("#mainResult");
                 const button = e.parentNode.previousElementSibling;
                 if (button.checked) {
-                    mainSpan.innerHTML = mainSpan.innerHTML.substring(0, mainSpan.innerHTML.indexOf(":") + 2) + result.range[0];
-                    if (result.range.length > 1) mainSpan.innerHTML += "-" + result.range[result.range.length-1];
-                    mainSpan.innerHTML += " (" + (result.minDamage*100).toFixed(1) + " - " + (result.maxDamage*100).toFixed(1) + "%) -- ";
-                    if (result.hkoPercentage == 1) mainSpan.innerHTML += "guaranteed ";
-                    else mainSpan.innerHTML += (result.hkoPercentage*100).toFixed(1) + "% chance to ";
-                    if (result.hkoMultiple == 1) mainSpan.innerHTML += "OHKO";
-                    else mainSpan.innerHTML += result.hkoMultiple + "HKO";
+                    mainSpan.textContent = mainSpan.textContent.substring(0, mainSpan.innerHTML.indexOf(":") + 2) + result.range[0];
+                    if (result.range.length > 1) mainSpan.textContent += "-" + result.range[result.range.length-1];
+                    mainSpan.textContent += " (" + (result.minDamage*100).toFixed(1) + " - " + (result.maxDamage*100).toFixed(1) + "%) -- ";
+                    if (result.hkoPercentage == 1) mainSpan.textContent += "guaranteed ";
+                    else mainSpan.textContent += (result.hkoPercentage*100).toFixed(1) + "% chance to ";
+                    if (result.hkoMultiple == 1) mainSpan.textContent += "OHKO";
+                    else mainSpan.textContent += result.hkoMultiple + "HKO";
                 }
                 textNode.nodeValue = isNaN(result.minDamage)
                     ? "0 - 0%"
@@ -94,9 +101,9 @@
             const classLetter = util.capitalizeFirstLetter(classDiv.classList[0])[0];
             const input = classDiv.querySelector("input");
             const hiddenDiv = classDiv.querySelector("div[hidden]");
-            if (hiddenDiv != void 0) {
+            if (hiddenDiv != undefined) {
                 hiddenDiv.id = hiddenId;
-                hiddenDiv.innerHTML = transformedIntoString + pokemonNumber;
+                hiddenDiv.textContent = transformedIntoString + pokemonNumber;
             }
             input.id = hiddenId + classLetter;
             input.setAttribute("aria-describedby", hiddenId);
@@ -107,7 +114,7 @@
             });
             const label = classDiv.querySelector("label");
             label.htmlFor = input.id;
-            label.innerHTML = "Transform";
+            label.textContent = "Transform";
             pokemonNumber--;
         }
         transformInfo.style.display = getGen() === "1" ? "unset" : "none";
@@ -115,6 +122,31 @@
         const critButtons = document.querySelectorAll("input.move-crit");
         for (const critButton of critButtons) {
             critButton.addEventListener("click", function(e) { onCritClick(e.target); });
+        }
+        if (window.location.href.indexOf("import") !== -1) {
+            const oldSets = localStorage.getItem("customsets");
+            setTimeout(function() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const ts = [urlParams.get("t1"), urlParams.get("t2")];
+                if (document.querySelector("input.import-name-text")) document.querySelector("input.import-name-text").value = ts[0] + " vs " + ts[1];
+                if (document.querySelector("button#import")) document.querySelector("button#import").click();
+                const ps = ["p1", "p2"];
+                const pokeInfos = document.querySelectorAll("fieldset.poke-info");
+                const importString = atob(urlParams.get("import"));
+                for (let i = 0; i < pokeInfos.length; i++) {
+                    if (pokeInfos[i].querySelector("input#importedSets")) pokeInfos[i].querySelector("input#importedSets").click();
+                    const firstNameIndex = importString.indexOf(ts[i]);
+                    const firstParanthesisIndex = importString.indexOf(")", firstNameIndex + 1);
+                    const firstPokemonName = importString.substring(firstNameIndex + ts[i].length + 2, firstParanthesisIndex);
+                    const setInput = pokeInfos[i].querySelector("input.set-selector");
+                    if (setInput) {
+                        setInput.value = (urlParams.has(ps[i]) ? urlParams.get(ps[i]) : firstPokemonName) + " (" + ts[i] + ") ";
+                        setInput.dispatchEvent(new Event("change", { "bubbles": false }));
+                        pokeInfos[i].querySelector(".select2-chosen").textContent = setInput.value;
+                    }
+                    if (oldSets !== "null") localStorage.setItem("customsets", oldSets);
+                }
+            }, 0);
         }
     })();
 
@@ -185,7 +217,7 @@
         const pokemonId = Object.keys(consts.pokedex).find(i => consts.pokedex[i].name === name);
         const pokemon = consts.pokedex[pokemonId];
         pokemon.id = pokemonId;
-        if (level != void 0) pokemon.level = level;
+        if (level != undefined) pokemon.level = level;
         return pokemon;
     };
 
@@ -198,14 +230,16 @@
         if (opposingNameHtml.indexOf(consts.transformedIntoString) === -1) return;
         const resultSpan = document.querySelector("#resultMove" + moveNumber).parentElement.querySelector("span");
         if (button.checked) {
-            resultSpan.oldText = resultSpan.innerHTML;
-            const result = calculateDamage(button.parentElement, isRight);
+            resultSpan.oldText = resultSpan.textContent;
+            const result = calculateDamage(button.parentElement, isRight, true);
             setTimeout(function() {
-                resultSpan.innerHTML = (result.critMinDamage*100).toFixed(1) + " - " + (result.critMaxDamage*100).toFixed(1) + "%";
+                const minDamage = result.critMinDamage || result.minDamage;
+                const maxDamage = result.critMaxDamage || result.maxDamage;
+                resultSpan.textContent = (minDamage*100).toFixed(1) + " - " + (maxDamage*100).toFixed(1) + "%";
             }, 1);
         }
         else {
-            resultSpan.innerHTML = resultSpan.oldText;
+            resultSpan.textContent = resultSpan.oldText;
         }
     };
 
@@ -252,21 +286,21 @@
                 const otherSpaceIndex = otherName.indexOf(" ");
                 const newName = name.substring(0, spaceIndex + 1) + consts.transformedIntoString + otherName.substring(0, otherSpaceIndex) + ")" + name.substring(spaceIndex);
                 setInput.value = name; 
-                setSelector.querySelector(".select2-chosen").innerHTML = newName;
+                setSelector.querySelector(".select2-chosen").textContent = newName;
                 setTimeout(function() { 
-                    setSelector.parentElement.querySelector("span.totalMod").innerHTML = otherSetSelector.parentElement.querySelector("span.totalMod").innerHTML;
+                    setSelector.parentElement.querySelector("span.totalMod").textContent = otherSetSelector.parentElement.querySelector("span.totalMod").textContent;
                 }, 0);
             }
             else {
                 setInput.value = name.substring(0, name.indexOf(consts.transformedIntoString)) + name.substring(name.indexOf(") (") + 1);
                 setInput.dispatchEvent(new Event("change", { "bubbles": true }));
-                setSelector.querySelector(".select2-chosen").innerHTML = setInput.value;
+                setSelector.querySelector(".select2-chosen").textContent = setInput.value;
             }
         }
         else {
             setInput.value = button.oldName;
             setInput.dispatchEvent(new Event("change", { "bubbles": true }));
-            setSelector.querySelector(".select2-chosen").innerHTML = setInput.value;
+            setSelector.querySelector(".select2-chosen").textContent = setInput.value;
             if (button.oldMoves) for (let i = 0; i < button.oldMoves.length; i++) {
                 moves[i].value = button.oldMoves[i];
                 moves[i].dispatchEvent(new Event("change", { "bubbles": true }));
