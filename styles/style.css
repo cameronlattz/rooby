@@ -73,10 +73,10 @@ body .movemenu button.recovery-failure small {
     cursor: pointer;
 }
 div.rooby-menu {
-    background: rgba(242,247,250,.85);
     max-height: 200px;
     overflow-y: auto;
     position: relative;
+    text-align: left;
 }
 .rooby-menu:not(:has(a:not([style="display: none;"]))) {
     display: none;
@@ -84,17 +84,12 @@ div.rooby-menu {
 .rooby-menu small:nth-of-type(3) {
     margin: 0px 5px;
 }
-div.rooby-menu > p {
-    text-shadow: none;
-    color: black;
-    margin: 3px 0px;
-}
 .rooby-menu img {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 0;
     top: 0px;
     height: 100%;
+    max-height: max-content;
     z-index: -1;
 }
 .rooby-menu > div {
@@ -102,6 +97,9 @@ div.rooby-menu > p {
 }
 .rooby-menu .vs {
     padding: 0px 5px;
+}
+.rooby-menu p .label {
+    margin-left: 10px;
 }
 .failure:not(.p0) {
     color: #f00;

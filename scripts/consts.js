@@ -2332,11 +2332,6 @@ const consts = function() {
 			pp: 5,
 			priority: 0,
 			flags: {charge: 1, protect: 1, mirror: 1, distance: 1},
-			critRatio: 2,
-			secondary: {
-				chance: 30,
-				volatileStatus: 'flinch',
-			},
 			target: "any",
 			type: "Flying"
 		},

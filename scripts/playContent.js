@@ -193,6 +193,7 @@
                         exactHealth: args.exactHealth,
                     }
                     const damageCalc = roobyCalc.damage(pokemon, null, moveName);
+                    if (damageCalc == undefined) continue;
                     if (damageCalc.failureRate > 0 && args.healthRemainingPercent !== 100) {
                         moveButton.classList.add("recovery-failure");
                         moveButton.setAttribute("title", (damageCalc.failureRate*100).toFixed(2) + "%  chance a recovery move will fail");
@@ -295,7 +296,7 @@
                             const newChange = Math.round(Math.abs(rating - newRating));
                             newRatingStrong.textContent = newRating;
                             let text = "(+" + newChange + " for winning)";
-                            if (result === 0) text = "(" + newChange + " for tie)";
+                            if (result === 0) text = "(" + (rating - newRating > 0 ? "+" : "") + newChange + " for tying)";
                             else if (!isWinner) text = "(-" + newChange + " for losing)";
                             const textNode2 = document.createTextNode(text);
                             ratingChange.appendChild(textNode1);
@@ -1838,7 +1839,13 @@
             roobyMenuTitle = document.createElement("p");
             roobyMenu.appendChild(roobyMenuTitle);
         }
-        roobyMenuTitle.textContent = battles.length + " RooBY Matches";
+        let roobyTitleLabel = roobyMenuTitle.querySelector("label");
+        if (roobyTitleLabel == undefined) {
+            roobyTitleLabel = document.createElement("label");
+            roobyTitleLabel.className = "label";
+            roobyMenuTitle.appendChild(roobyTitleLabel);
+        }
+        roobyTitleLabel.textContent = battles.length + " RooBY Game(s)";
         let blocklinks = Array.from(roobyMenu.querySelectorAll("a.blocklink"));
         for (let i = 0; i < blocklinks.length; i++) {
             if (!battles.some(b => b.id === blocklinks[i].getAttribute("data-rooby-id"))) {
