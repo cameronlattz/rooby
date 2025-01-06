@@ -8,15 +8,15 @@ const consts = function() {
 		},
 		backdrop: "1",
 		shinyPercentage: 3,
-		roobyMatchmaking: false,
+		roobyMatchmaking: true,
 		damageCalculator: true,
 		movesetCalculator: true,
 		unrevealedCalculator: true,
 		miscCalculator: true,
 		trainerTooltip: true,
-		animateTrainer: false,
+		animateTrainer: true,
 		useModernSprites: false,
-		randomAvatar: 1
+		randomAvatar: 0
 	};
 
 	const defaultSimulations = 100000;

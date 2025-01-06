@@ -68,7 +68,12 @@
     })();
 
     window.onload = async function () {
-        _settings = await util.getStorage("settings") || _settings;
+        const savedSettings = await util.getStorage("settings");
+        for (const key in savedSettings) {
+            if (_settings[key] !== undefined) {
+                _settings[key] = savedSettings[key];
+            }
+        }
         updateBackdrop(document.querySelector(".backdrop"));
         for (const img of Array.from(document.querySelectorAll("img"))) {
             updateSprite(img);
