@@ -262,56 +262,59 @@
                     const log = wonChat.closest(".message-log");
                     const small = log.querySelector("small");
                     if (small.getAttribute("data-rooby")) {
-                        util.reportRooBYLadder("", replayLink, "end");
-                        setTimeout(function () { strong.parentElement.click() }, 0);
-                        const players = {};
-                        const cleanSplit = small.textContent.replace(/\W/g, '').split("and");
-                        const player1Name = cleanSplit[0].replace(/\s/g,'').toLowerCase();
-                        const player2Name = cleanSplit[1].replace("joined", "").replace(/\s/g,'').toLowerCase();
-                        const battleHistories = Array.from(document.querySelectorAll(".battle-history"));
-                        const battleHistory = battleHistories.find(bh => bh.innerHTML.includes(" won the battle!"));
-                        let winnerName = "";
-                        if (battleHistory) {
-                            winnerName = battleHistory.querySelector("strong").textContent.replace(/\s/g,'').toLowerCase();
-                        }
-                        const format = "rooby_crazyhouse";
-                        const rating = "Elo";
-                        const playerNames = [player1Name, player2Name];
-                        for (const name of playerNames) {
-                            players[name] = 1000;
-                            if (_roobyLeaderboards &&_roobyLeaderboards[format] && _roobyLeaderboards[format][name]
-                                && _roobyLeaderboards[format][name][rating]) {
-                                    players[name] = Math.round(_roobyLeaderboards[format][name][rating]);
+                        util.reportRooBYLadder("", replayLink, "end").then(data => {
+                            const players = {};
+                            const cleanSplit = small.textContent.replace(/\W/g, '').split("and");
+                            const player1Name = cleanSplit[0].replace(/\s/g,'').toLowerCase();
+                            const player2Name = cleanSplit[1].replace("joined", "").replace(/\s/g,'').toLowerCase();
+                            const battleHistories = Array.from(document.querySelectorAll(".battle-history"));
+                            const battleHistory = battleHistories.find(bh => bh.innerHTML.includes(" won the battle!"));
+                            let winnerName = "";
+                            if (battleHistory) {
+                                winnerName = battleHistory.querySelector("strong").textContent.replace(/\s/g,'').toLowerCase();
                             }
-                        }
-                        for (const name in players) {
-                            const opponentName = player1Name === name ? player2Name : player1Name;
-                            const result = winnerName === name ? 1 : winnerName === opponentName ? -1 : 0;
-                            const isWinner = result === 1;
-                            const change = roobyCalc.Elo(players[name], players[opponentName], result);
-                            const ratingChange = document.createElement("div");
-                            ratingChange.className = "chat";
-                            const rating = players[name];
-                            const textNode1 = document.createTextNode(name + "'s RooBY rating: " + rating + " → ");
-                            const newRatingStrong = document.createElement("strong");
-                            const br = document.createElement("br");
-                            let newRating = rating;
-                            if (result !== 0) newRating = isWinner ? rating + change : rating - change;
-                            newRating = Math.round(Math.max(1000, newRating));
-                            const newChange = Math.round(Math.abs(rating - newRating));
-                            newRatingStrong.textContent = newRating;
-                            let text = "(+" + newChange + " for winning)";
-                            if (result === 0) text = "(" + (rating - newRating > 0 ? "+" : "") + newChange + " for tying)";
-                            else if (!isWinner) text = "(-" + newChange + " for losing)";
-                            const textNode2 = document.createTextNode(text);
-                            ratingChange.appendChild(textNode1);
-                            ratingChange.appendChild(newRatingStrong);
-                            ratingChange.appendChild(br);
-                            ratingChange.appendChild(textNode2);
-                            log.appendChild(ratingChange);
-                        }
+                            const tabId = playUtil.getTabIdByRoomElement(wonChat.closest(".ps-room"));
+                            const ladderItem = _roobyLadders.find(l => l.link && l.link.includes(tabId));
+                            if (!ladderItem) return;
+                            const format = ladderItem.format;
+                            if (!format || !_roobyFormats || !_roobyFormats[format] || !_roobyFormats[format].ratings
+                                || !Array.isArray(_roobyFormats[format].ratings) || _roobyFormats[format].ratings.length === 0) return;
+                            const ratingName = _roobyFormats[format].ratings[0];
+                            const playerNames = [player1Name, player2Name];
+                            for (const name of playerNames) {
+                                players[name] = 1000;
+                                if (_roobyLeaderboards && ratingName &&_roobyLeaderboards[format] && _roobyLeaderboards[format][name]
+                                    && _roobyLeaderboards[format][name][ratingName]) {
+                                        players[name] = Math.round(_roobyLeaderboards[format][name][ratingName]);
+                                }
+                            }
+                            for (const name in players) {
+                                const opponentName = player1Name === name ? player2Name : player1Name;
+                                const result = winnerName === name ? 1 : winnerName === opponentName ? -1 : 0;
+                                const isWinner = result === 1;
+                                const newRating = Math.round(data[format][name][ratingName]);
+                                const rating = players[name];
+                                const ratingChange = document.createElement("div");
+                                ratingChange.className = "chat";
+                                const textNode1 = document.createTextNode(name + "'s RooBY rating: " + rating + " → ");
+                                const newRatingStrong = document.createElement("strong");
+                                const br = document.createElement("br");
+                                const newChange = Math.round(Math.abs(rating - newRating));
+                                newRatingStrong.textContent = newRating;
+                                let text = "(+" + newChange + " for winning)";
+                                if (result === 0) text = "(" + (rating - newRating > 0 ? "+" : "") + newChange + " for tying)";
+                                else if (!isWinner) text = "(-" + newChange + " for losing)";
+                                const textNode2 = document.createTextNode(text);
+                                ratingChange.appendChild(textNode1);
+                                ratingChange.appendChild(newRatingStrong);
+                                ratingChange.appendChild(br);
+                                ratingChange.appendChild(textNode2);
+                                log.appendChild(ratingChange);
+                            }
+                            _roobyLeaderboards = data;
+                        });
+                        setTimeout(function () { strong.parentElement.click() }, 0);
                     }
-
                 }
             } else setTimeout(function () { settingsPopup(element); }, 10);
         }
@@ -389,6 +392,7 @@
                 if (element.classList.contains("trainer")) {
                     updateIcons(element);
                     updateTrainerIcon(element);
+                    updateBackdrop(roomElement.querySelector(".backdrop"));
                     loadRatings(element);
                     addUserLink(element);
                     const isRight = playUtil.getIsRightByChildElement(element);
@@ -407,7 +411,6 @@
                 else if (element.classList.contains("backdrop")) {
                     updateBackdrop(element);
                     setTimeout(function (elem) { updateBackdrop(elem); }, 0, element);
-                    setTimeout(function (elem) { updateBackdrop(elem); }, 500, element);
                 }
                 else if (element.classList.contains("battle-history") && document.querySelector(".usernametext")) {
                     if (element.innerHTML.indexOf("Battle started between ") !== -1 && _page === "play") {
@@ -502,16 +505,11 @@
             nameTh.textContent = "Name";
             headerTr.appendChild(nameTh);
             const ladders = _roobyLeaderboards[formatKey];
-            const ladderKeys = ladders ? Object.keys(ladders) : ["Rating"];
-            const ratingNames = [];
-            if (ladderKeys.length > 0) {
-                const nameKeys = ladders ? Object.keys(ladders[ladderKeys[0]]) : [];
-                for (const nameKey of nameKeys) {
-                    const eloTh = document.createElement("th");
-                    eloTh.textContent = nameKey;
-                    headerTr.appendChild(eloTh);
-                    ratingNames.push(nameKey);
-                }
+            const ratingNames = (_roobyFormats && _roobyFormats[formatKey]) ? _roobyFormats[formatKey].ratings : ["Rating"];
+            for (const ratingName of ratingNames) {
+                const eloTh = document.createElement("th");
+                eloTh.textContent = ratingName;
+                headerTr.appendChild(eloTh);
             }
             tbody.appendChild(headerTr);
             loadRoobyLeaderboardData();
@@ -536,7 +534,7 @@
             if (ladders == undefined) {
                 const tr = document.createElement("tr");
                 const td = document.createElement("td");
-                td.colSpan = 3;
+                td.colSpan = 2 + ratingNames.length;
                 td.textContent = "No players found.";
                 tr.appendChild(td);
                 tbody.appendChild(tr);
@@ -1143,6 +1141,7 @@
         const moveName = tooltip.querySelector("h2").childNodes[0].nodeValue;
         if (moveName === "Recharge") return;
         const moveButton = Array.from(roomElement.querySelectorAll("button[name=chooseMove]")).find(b => b.childNodes[0].nodeValue === moveName);
+        if (moveButton == undefined) return;
         let failureRate = Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
         failureRate = isNaN(failureRate) ? null : failureRate;
 
@@ -1302,6 +1301,7 @@
             }
             else {
                 const damageCalc = roobyCalc.damage(tooltipPokemon, tooltipPokemon.opponent, revealedMoveName);
+                if (damageCalc == undefined) return;
                 let failureRate = moveButton == undefined ? damageCalc.failureRate : Number.parseFloat(moveButton.getAttribute("data-failure-rate"));
                 failureRate = isNaN(failureRate) ? damageCalc.failureRate : failureRate;
                 showRecoverFailureRate(revealedMoveElement, failureRate);
