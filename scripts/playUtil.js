@@ -183,6 +183,13 @@ const playUtil = function () {
         });
     }
 
+    const closePopup = function () {
+        window.postMessage({
+            function: "closePopup",
+            args: {}
+        });
+    }
+
     const changeAvatar = function (name, animateTrainer) {
         setTimeout(function() {
             const pmLogs = Array.from(document.querySelectorAll(".pm-log"));
@@ -452,6 +459,7 @@ const playUtil = function () {
         chatOutput,
         changeAvatar,
         challenge,
+        closePopup,
         getActivePokemonId,
         getAttackMultiplier,
         getIsRightByChildElement,

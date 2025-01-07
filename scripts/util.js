@@ -1,5 +1,6 @@
 window.util = function() {
 	const api = chrome || browser;
+	const environment = "";
 	const BattleTooltips = function() {
 		function BattleTooltips(battle) {
 			const _this = this;
@@ -294,6 +295,7 @@ window.util = function() {
 		if (id) fetchString += "&id=" + id;
 		if (link) fetchString += "&link=" + link;
 		if (status) fetchString += "&status=" + status;
+		if (environment) fetchString += "&env=" + environment;
 		return fetch(fetchString).then(response => response.json())
 	}
 
@@ -301,16 +303,17 @@ window.util = function() {
 		let fetchString = "https://datumlocker.com/rooby/request.php?username=" + username + "&format=" + format + "&timestamp=" + new Date().getTime();
 		if (id) fetchString += "&id=" + id;
 		if (cancel) fetchString += "&cancel=true";
+		if (environment) fetchString += "&env=" + environment;
 		return fetch(fetchString).then(response => response.json())
 	}
 
 	const loadRooBYLadderData = function() {
-		return fetch("https://datumlocker.com/rooby/ladder.json?timestamp=" + new Date().getTime())
+		return fetch("https://datumlocker.com/rooby/" + environment + "ladder.json?timestamp=" + new Date().getTime())
 			.then(response => response.json())
 	}
 
 	const loadRooBYLeaderboardData = function() {
-		return fetch("https://datumlocker.com/rooby/leaderboard.json?timestamp=" + new Date().getTime())
+		return fetch("https://datumlocker.com/rooby/" + environment + "leaderboard.json?timestamp=" + new Date().getTime())
 			.then(response => response.json())
 	}
 

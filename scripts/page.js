@@ -16,6 +16,8 @@
                 return challenge(room, args);
             case "changeAvatar":
                 return changeAvatar(room, args);
+            case "closePopup":
+                return closePopup();
             case "getPokemonLevels":
                 return getPokemonLevels(room, args);
             case "getPokemonStatsByName":
@@ -25,26 +27,30 @@
             case "getExactHealthByName":
                 return getExactHealthByName(room, args);
             case "joinRoom":
-                return joinRoom(room, args);
+                return joinRoom(args);
             case "notify":
-                return notify(room, args);
+                return notify(args);
             case "uploadReplay":
-                return uploadReplay(room, args);
+                return uploadReplay(room);
             default:
                 return;
         }
     }
 
-    this.uploadReplay = function(room, args) {
+    this.uploadReplay = function(room) {
         room.send("/savereplay");
     }
 
-    this.joinRoom = function(room, args) {
+    this.joinRoom = function(args) {
         window.app.joinRoom(args.id);
     }
 
-    this.notify = function(room, args) {
+    this.notify = function(args) {
         window.app.addPopupMessage(args.message);
+    }
+
+    this.closePopup = function() {
+        window.app.closePopup();
     }
 
     this.challenge = function(room, args) {

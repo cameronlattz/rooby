@@ -810,7 +810,7 @@
     }
 
     const changeAvatar = function(element) {
-        if (!_settings.randomAvatar || _settings.randomAvatar === 0) return;
+        if (!_settings.randomAvatar || (_settings.randomAvatar !== 1 && _settings.randomAvatar !== 2)) return;
         const tab = playUtil.getParentRoomElement(element, _page);
         if (!tab) return;
         const usernameElement = document.querySelector(".usernametext");
@@ -821,9 +821,8 @@
             const loggedInName = usernameElement.innerText.replace(/\s/g,'');
             if (trainerName == loggedInName) match = true;
         }
-        if (!match) return;
         const form = tab.querySelector("form.chatbox");
-        if (!form) return;
+        if (!form || !match) return;
         const histories = tab.querySelectorAll(".battle-log");
         for (const history of histories) {
             if (history.innerHTML.indexOf("Avatar changed to:") !== -1) return;
@@ -1920,8 +1919,7 @@
                     firstEm.prepend(spinner);
                 }
                 else {
-                    firstEm.textContent = battle.p1;
-                    if (!battle.p2) firstEm.textContent += " (seeking)";
+                    firstEm.textContent = battle.p2 ? battle.p1 : "Battle Request";
                 }
                 blocklink.setAttribute("data-rooby-id", battle.id);
                 const clone = blocklink.cloneNode(true);
@@ -2033,38 +2031,58 @@
                 const lis = detailsClone.querySelectorAll("li");
                 const roobyFormats = Object.keys(_roobyFormats);
                 const searchClick = function(e) {
-                    const loggedInName = document.querySelector(".usernametext").innerText.replace(/\s/g,'').toLowerCase();
+                    const userName = document.querySelector(".usernametext");
+                    if (!userName) return;
+                    const loggedInName = userName.innerText.replace(/\s/g,'').toLowerCase();
                     const roobyName = e.currentTarget.closest("form").getAttribute("data-rooby-name");
-                    const roobyFormats = Object.keys(_roobyFormats);
-                    const format = roobyFormats.find(fk => _roobyFormats[fk].name === roobyName);
-                    util.requestRooBYLadder(loggedInName, format).then(function (battles) {
-                        const lastBattle = battles[battles.length - 1];
-                        lastBattle.self = true;
+                    if (roobyName) {
+                        const roobyFormats = Object.keys(_roobyFormats);
+                        const format = roobyFormats.find(fk => _roobyFormats[fk].name === roobyName);
+                        const battles = [..._roobyLadders];
+                        const randomNumber = util.randomNumbersGenerator(Date.now());
+                        battles.push({ format: format, p1: loggedInName, id: randomNumber });
                         showRoobyLadder(battles);
-                    });
+                        util.requestRooBYLadder(loggedInName, format).then(function (battles) {
+                            const lastBattle = battles[battles.length - 1];
+                            lastBattle.self = true;
+                            showRoobyLadder(battles);
+                        });
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }
+                }
+                const formatClick = function (e) {
+                    const button = e.currentTarget;
+                    const battleform = document.getElementById("room-").querySelector("form.battleform");
+                    const search = battleform.querySelector("button[name='search']");
+                    button.value = search ? "gen1hackmonscup" : format.command;
+                    setTimeout(function () {
+                        const format = Object.values(_roobyFormats).find(f => f.name === button.textContent);
+                        button.value = format.command;
+                        if (search) {
+                            const formatselect = battleform.querySelector("button.formatselect");
+                            formatselect.textContent = "[Gen 1] " + e.target.textContent;
+                            battleform.setAttribute("data-rooby-name", e.target.textContent);
+                            const teamSelect = battleform.querySelector("button.teamselect");
+                            const privateInput = battleform.querySelector("input[name='private']");
+                            teamSelect.closest("p").style.display = "none";
+                            privateInput.closest("p").style.display = "none";
+                            const newSearch = search.cloneNode(true);
+                            if (!search.parentNode) return;
+                            search.parentNode.replaceChild(newSearch, search);
+                            newSearch.removeEventListener("click", searchClick);
+                            newSearch.addEventListener("click", searchClick);
+                        }
+                    }, 0);
+                    button.click();
                 }
                 for (const formatKey of roobyFormats) {
                     const format = _roobyFormats[formatKey];
                     const newLi = lis[1].cloneNode(true);
                     const button = newLi.querySelector("button");
                     button.textContent = format.name;
-                    button.setAttribute("data-rooby-value", formatKey);
-                    button.value = format.command;
-                    button.addEventListener("click", function (e) {
-                        setTimeout(function () {
-                            const battleform = document.getElementById("room-").querySelector("form.battleform");
-                            const search = battleform.querySelector("button[name='search']");
-                            if (search) {
-                                const formatselect = battleform.querySelector("button.formatselect");
-                                formatselect.textContent = "[Gen 1] " + e.target.textContent;
-                                battleform.setAttribute("data-rooby-name", e.target.textContent);
-                                const newSearch = search.cloneNode(true);
-                                search.parentNode.replaceChild(newSearch, search);
-                                newSearch.addEventListener("click", searchClick);
-                            }
-                        }, 0);
-                        button.click();
-                    });
+                    button.removeEventListener("click", formatClick);
+                    button.addEventListener("click", formatClick);
                     detailsClone.appendChild(newLi);
                 }
                 for (const li of lis) {
@@ -2074,6 +2092,10 @@
                 for (const button of buttons) {
                     button.addEventListener("click", function () {
                         const battleform = document.getElementById("room-").querySelector("form.battleform");
+                        const teamSelect = battleform.querySelector("button.teamselect");
+                        const privateInput = battleform.querySelector("input[name='private']");
+                        teamSelect.closest("p").style.display = "block";
+                        privateInput.closest("p").style.display = "block";
                         battleform.removeAttribute("data-rooby-name");
                     });
                 }
