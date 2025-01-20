@@ -68,6 +68,24 @@
     })();
 
     window.onload = async function () {
+        const roobyVersion = await util.getStorage("roobyVersion");
+        if (roobyVersion != undefined) {
+            if (roobyVersion["roobyVersion"].state === "install") {
+                const randomImg = document.createElement("img");
+                randomImg.src = api.runtime.getURL("images/random.png");
+                const defaultImg = document.createElement("img");
+                defaultImg.src = api.runtime.getURL("images/default.png");
+                const optionsButton = "<button class='icon button'><i class='fa fa-cog'></i></button>";
+                const message = "<div class='rooby-first-install'><h2>Thanks for installing RooBY!</h2><div>Choose which style you would like to use:</div><table><tr><td>"
+                    + "<button class='close'>" + randomImg.outerHTML + "</button>"
+                    + "</td><td> OR </td><td>"
+                    + "<button class='close'>" + defaultImg.outerHTML + "</button>"
+                    + "</td></tr></table><div>Please give Random a shot! It adds variety!</div><small>*If you would like to switch from Random to Default, click the "
+                    + optionsButton
+                    + " Options button on the right and set Front Sprites, Back Sprites, and Backdrop to Default.</small></div>";
+                playUtil.addPopup(message);
+            }
+        }
         const savedSettings = await util.getStorage("settings");
         for (const key in savedSettings) {
             if (_settings[key] !== undefined) {
@@ -173,7 +191,7 @@
             }
         });
 
-        window.addEventListener("message", (event) => {
+        window.addEventListener("message", async (event) => {
             if (!consts.urls.gameUrls.includes(event.origin)) return;
             const args = event.data.args;
             if (event.data.function === "getPokemonLevelsReturn") {
@@ -208,6 +226,21 @@
             }
             else if (event.data.function === "exportTeamsReturn") {
                 exportTeams(args.targetUid, args.teams);
+            }
+            else if (event.data.function === "addPopupReturn") {
+                if (event.data.args) {
+                    const setting = event.data.args[0] === 0 ? "1" : "0";
+                    _settings.sprites.front = setting;
+                    _settings.sprites.back = setting;
+                    _settings.backdrop = setting;
+                    _settings.shinyPercentage = event.data.args[0] === 0 ? 3 : 0;
+                    const currentVersion = api.runtime.getManifest().version;
+                    await util.saveStorage("roobyVersion", { version: currentVersion, state: "done" });
+                    await util.saveStorage("settings", "sprites", _settings.sprites);
+                    await util.saveStorage("settings", "backdrop", _settings.backdrop);
+                    await util.saveStorage("settings", "shinyPercentage", _settings.shinyPercentage);
+                    setTimeout(function () { window.location.reload(); }, 500);
+                }
             }
         }, false);
     }
@@ -807,32 +840,6 @@
             tooltip.hideTooltip(event.target);
             element.setAttribute("title", "Not revealed");
         });
-    }
-
-    const changeAvatar = function(element) {
-        if (!_settings.randomAvatar || (_settings.randomAvatar !== 1 && _settings.randomAvatar !== 2)) return;
-        const tab = playUtil.getParentRoomElement(element, _page);
-        if (!tab) return;
-        const usernameElement = document.querySelector(".usernametext");
-        const trainerElements = tab.querySelectorAll(".trainer");
-        let match = false;
-        for (const trainerElement of trainerElements) {
-            const trainerName = playUtil.getTrainerNameByElement(trainerElement);
-            const loggedInName = usernameElement.innerText.replace(/\s/g,'');
-            if (trainerName == loggedInName) match = true;
-        }
-        const form = tab.querySelector("form.chatbox");
-        if (!form || !match) return;
-        const histories = tab.querySelectorAll(".battle-log");
-        for (const history of histories) {
-            if (history.innerHTML.indexOf("Avatar changed to:") !== -1) return;
-        }
-        let trainerName = "";
-        while (trainerName.length === 0 || trainerName.indexOf("2") !== -1) {
-            const spriteNames = _settings.randomAvatar === 1 ? consts.trainerSprites : consts.animatedTrainerSprites;
-            trainerName = spriteNames[Math.floor(Math.random() * spriteNames.length)];
-        }
-        playUtil.changeAvatar(trainerName, _settings.animateTrainer);
     }
 
     const showTrainerTooltip = function (element) {
@@ -1992,35 +1999,7 @@
     const settingsPopup = function (element) {
         const avatarButton = element.querySelector("[name='avatars']");
         if (avatarButton == undefined) {
-            const avatarList = element.querySelector(".avatarlist");
-            if (avatarList && !avatarList.querySelector("button[id]")) {
-                const avatarButtons = Array.from(avatarList.querySelectorAll("button:not([id])"));
-                for (const button of avatarButtons) {
-                    button.addEventListener("click", function (e) {
-                        _settings.randomAvatar = 0;
-                        util.saveStorage("settings", "randomAvatar", _settings.randomAvatar);
-                    });
-                }
-                const randomTypes = ["randomTrainer", "randomAnimatedTrainer"];
-                for (const randomType of randomTypes) {
-                    const button = document.createElement("button");
-                    button.setAttribute("id", "randomAvatarButton");
-                    button.setAttribute("style", "background-image: url(" + api.runtime.getURL("images/sprites/trainers/" + randomType + ".png") + ");")
-                    button.classList.add("option", "pixelated", "custom");
-                    const animated = randomType === "randomAnimatedTrainer" ? "animated" : "";
-                    button.setAttribute("title", "Random " + animated + " per battle");
-                    button.addEventListener("click", function () {
-                        const sprites = animated.length === 0 ? consts.trainerSprites : consts.animatedTrainerSprites;
-                        const randomSprite = sprites[Math.floor(Math.random() * sprites.length)];
-                        playUtil.changeAvatar(randomSprite, _settings.animateTrainer);
-                        _settings.randomAvatar = animated.length === 0 ? 1 : 2;
-                        util.saveStorage("settings", "randomAvatar", _settings.randomAvatar);
-                        this.parentElement.parentElement.querySelector("[name=close]").click();
-                    });
-                    avatarList.prepend(button);
-                }
-            }
-            else if (Array.from(element.childNodes).some(c => c.getAttribute("name") === "formats")) {
+            if (Array.from(element.childNodes).some(c => c.getAttribute("name") === "formats")) {
                 if (element.querySelector(".rooby-mods") || _settings.roobyMatchmaking === false) return;
                 const popupmenu = element.querySelector("[name=formats] .popupmenu");
                 const details = popupmenu.querySelector("details");
@@ -2437,9 +2416,6 @@
                 const shinyPercentage = Number.parseInt(_settings.shinyPercentage) || 0;
                 const spritesObj = _settings.sprites[key] == 1 ? _randomSprites[tab] : _randomDefaultSprites[tab];
                 if (pokemonShinyPrng < shinyPercentage && shinyPercentage !== 0) {
-                    // if (_settings.sprites["shiny"] == 0) {
-                    //     spriteSrc = key === "back" ? spritesObj["back-shiny"] : spritesObj["shiny"];
-                    // }
                     if (_settings.sprites["shiny"] == 1 || _settings.sprites["shiny"] == 2) {
                         spriteSrc = spritesObj[key === "back" ? "back-shiny" : "shiny"];
                     }

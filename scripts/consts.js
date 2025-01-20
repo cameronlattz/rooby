@@ -1,13 +1,13 @@
 const consts = function() {
 	const defaultSettings = {
 		sprites: {
-			front: "1",
-			back: "1",
+			front: "0",
+			back: "0",
 			icons: "3",
 			shiny: "3"
 		},
-		backdrop: "1",
-		shinyPercentage: 3,
+		backdrop: "0",
+		shinyPercentage: 0,
 		roobyMatchmaking: true,
 		damageCalculator: true,
 		movesetCalculator: true,

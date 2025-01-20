@@ -174,12 +174,17 @@ const playUtil = function () {
         });
     }
 
+    const addPopup = function (html) {
+        window.postMessage({
+            function: "addPopup",
+            args: { html }
+        });
+    }
+
     const notify = function (message) {
         window.postMessage({
             function: "notify",
-            args: {
-                message: message
-            }
+            args: { message }
         });
     }
 
@@ -454,6 +459,7 @@ const playUtil = function () {
     }
 
     return {
+        addPopup,
         animateAvatar,
         buildSettingsP,
         chatOutput,

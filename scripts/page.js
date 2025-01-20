@@ -3,33 +3,35 @@
         if (event.origin !== "https://play.pokemonshowdown.com" && event.origin !== "https://replay.pokemonshowdown.com") return;
         if (event.data.function != undefined && !event.data.function.endsWith("Return")) {
             const room = Object.keys(window.app.rooms).map(key => window.app.rooms[key]).find(r => r.id.endsWith(event.data.args.tab));
-            event.data.args = runFunc(event.data.function, room, event.data.args);
+            event.data.args = runFunc(event, room);
             if (event.data.args == undefined) return;
             event.data.function = event.data.function + "Return";
             event.source.postMessage(event.data, event.origin);
         }
     });
 
-    const runFunc = function(functionName, room, args) {
-        switch (functionName) {
+    const runFunc = function(event, room) {
+        switch (event.data.function) {
+            case "addPopup":
+                return addPopup(event, event.data.args);
             case "challenge":
-                return challenge(room, args);
+                return challenge(room, event.data.args);
             case "changeAvatar":
-                return changeAvatar(room, args);
+                return changeAvatar(room, event.data.args);
             case "closePopup":
                 return closePopup();
             case "getPokemonLevels":
-                return getPokemonLevels(room, args);
+                return getPokemonLevels(room, event.data.args);
             case "getPokemonStatsByName":
-                return getPokemonStatsByName(room, args);
+                return getPokemonStatsByName(room, event.data.args);
             case "exportTeams":
-                return exportTeams(room, args);
+                return exportTeams(room, event.data.args);
             case "getExactHealthByName":
-                return getExactHealthByName(room, args);
+                return getExactHealthByName(room, event.data.args);
             case "joinRoom":
-                return joinRoom(args);
+                return joinRoom(event.data.args);
             case "notify":
-                return notify(args);
+                return notify(event.data.args);
             case "uploadReplay":
                 return uploadReplay(room);
             default:
@@ -43,6 +45,23 @@
 
     this.joinRoom = function(args) {
         window.app.joinRoom(args.id);
+    }
+
+    this.addPopup = function(event, args) {
+        const popup = window.app.addPopup(Popup, {htmlMessage: args.html});
+        const buttons = popup.el.querySelectorAll("button.close");
+        for (const button of buttons) {
+            button.addEventListener("click", (element) => {
+                const button = element.target.closest("button") || element.target;
+                const popup = element.target.closest(".ps-popup");
+                const buttons = popup.querySelectorAll("button.close");
+                const buttonIndex = Array.from(buttons).indexOf(button);
+                event.data.args = [buttonIndex];
+                event.data.function = event.data.function + "Return";
+                event.source.postMessage(event.data, event.origin);
+                window.app.closePopup();
+            });
+        }
     }
 
     this.notify = function(args) {

@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,  
     "name": "RooBY",
-    "version": "1.1.2",
+    "version": "1.2.0",
     "description": "Adds calculators and extra functionality to Generation 1 Pokemon Showdown",
     "permissions": [
       "storage"
@@ -46,7 +46,7 @@
     ],
     "web_accessible_resources": [{
       "matches": ["<all_urls>"],
-      "resources": ["images/icon-128.png", "images/digimonicons-sheet.png", "images/gen5icons-sheet.png", "images/gen5icons-pokeball-sheet.png", "images/articons-sheet.png", "images/articons-pokeball-sheet.png", "images/sprites/*.png", "images/backdrops/*"]
+      "resources": ["images/icon-128.png", "images/random.png", "images/default.png", "images/digimonicons-sheet.png", "images/gen5icons-sheet.png", "images/gen5icons-pokeball-sheet.png", "images/articons-sheet.png", "images/articons-pokeball-sheet.png", "images/sprites/*.png", "images/backdrops/*"]
     }],
     "browser_specific_settings": {
       "gecko": {

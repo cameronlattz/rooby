@@ -230,3 +230,18 @@ div#backdropBottom.other-gen-backdrop {
 .backdrop.nauris-amatnieks {
     background-position-y: -75px;
 }
+.rooby-first-install {
+    text-align: left;
+}
+.rooby-first-install img {
+    width: 100%;
+}
+.rooby-first-install *:not(small) {
+    text-align: center;
+}
+.rooby-first-install *:has(+ small) {
+    margin-bottom: 1em;
+}
+.ps-popup:has(.rooby-first-install) button[name="close"] {
+    display: none;
+}
